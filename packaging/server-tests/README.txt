@@ -90,10 +90,13 @@ not a reboot result. Server versions are reported only after their actual runs.
 Local validation without installation
 ------------------------------------
   pwsh -NoProfile -File packaging/server-tests/check.ps1
+  pwsh -NoProfile -File packaging/server-tests/check.ps1 -Cli PATH/TO/pdfcraft-cli.exe
   actionlint -config-file packaging/server-tests/actionlint.yaml \
     .github/workflows/hot-folder-server.yml
-check.ps1 only parses scripts, exercises confinement and mocks the GitHub metadata
-verifier; it never runs acceptance.ps1 or accesses a real service/account/share.
+check.ps1 parses scripts, exercises confinement, preserves empty/single/multiple
+CLI-script arrays, and mocks the GitHub metadata verifier. The optional -Cli check
+also executes those scripts with the existing CLI, using only the read-only
+ocr_status tool. It never runs acceptance.ps1 or accesses a real service/account/share.
 
 Primary references
 ------------------

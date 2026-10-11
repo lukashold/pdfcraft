@@ -5,7 +5,8 @@ function Assert-That([bool] $Condition, [string] $Message) {
 }
 
 function Write-Json([string] $Path, $Value) {
-    [IO.File]::WriteAllText($Path, ($Value | ConvertTo-Json -Depth 40), [Text.UTF8Encoding]::new($false))
+    # The CLI requires a JSON array even when a script has zero or one step.
+    [IO.File]::WriteAllText($Path, (ConvertTo-Json -InputObject $Value -Depth 40), [Text.UTF8Encoding]::new($false))
 }
 
 function Assert-SafePath([string] $Path, [string] $AllowedRoot) {
