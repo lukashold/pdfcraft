@@ -4,7 +4,7 @@
 `ATTRIBUTION.toml`. No document is uploaded and no model is downloaded at runtime.
 Release packages ship these files beside the application.
 
-- English, German, French, Spanish and horizontal Japanese use PaddlePaddle's
+- English, German, French, Spanish, Italian and horizontal Japanese use PaddlePaddle's
   PP-OCRv6 small model through the existing Rust RTen runtime. The legacy English
   recognizer API remains available to existing callers.
 - PP-LCNet classifies quarter-turn orientation. Preprocessing centres on ink bounds,
@@ -42,3 +42,7 @@ languages, all quarter-turns, deskew, crop offsets and padding, unchanged exact-
 and stale results. Model tests report a skip when models are absent. The Japanese
 synthetic fixture uses the optional release `CRAFT_FONTS_DIR` checkout; generated
 fixtures and third-party document samples are not committed.
+
+The Italian regression recognizes all six accented vowels (`à è é ì ò ù`) in a
+synthetic sentence and checks that they survive saving/reopening without changing
+the scanned pixels. This is a regression fixture, not a real-document accuracy benchmark.

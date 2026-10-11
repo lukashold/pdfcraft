@@ -30,6 +30,11 @@ fn pages(what: &str) -> Value {
     json!({ "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 1, "description": format!("1-based page numbers {what}.") })
 }
 
+fn ocr_language() -> Value {
+    let codes: Vec<&str> = pdfcraft_engine::ocr::LANGUAGES.iter().map(|language| language.0).collect();
+    json!({ "type": "string", "enum": codes, "description": "Document language (default en)." })
+}
+
 fn path(what: &str) -> Value {
     json!({ "type": "array", "items": { "type": "integer", "minimum": 1 }, "description": format!("{what}: 1-based positions from the top level, e.g. [2, 1] = the first child of the second bookmark.") })
 }
@@ -924,7 +929,7 @@ pub fn tools() -> Vec<ToolDef> {
                     "doc": doc(),
                     "pages": pages("to recognise (default: all)"),
                     "dpi": { "type": "number", "minimum": 72, "maximum": 600, "description": "Resolution pages are read at (default 300; a scanned page is read at most at its own resolution)." },
-                    "auto_rotate": { "type": "boolean", "default": true }, "deskew": { "type": "boolean", "default": true }, "auto_crop": { "type": "boolean", "default": false }, "crop_margin": { "type": "number", "minimum": 0, "maximum": 20, "default": 2 }, "recognize": { "type": "boolean", "default": true }, "language": { "type": "string", "enum": ["en", "de", "ja", "fr", "es"], "description": "Document language (default en)." },
+                    "auto_rotate": { "type": "boolean", "default": true }, "deskew": { "type": "boolean", "default": true }, "auto_crop": { "type": "boolean", "default": false }, "crop_margin": { "type": "number", "minimum": 0, "maximum": 20, "default": 2 }, "recognize": { "type": "boolean", "default": true }, "language": ocr_language(),
                     "skip_text_pages": { "type": "boolean", "description": "Leave pages that already contain text alone (default true)." },
                 }),
                 &["doc"],
@@ -936,7 +941,7 @@ pub fn tools() -> Vec<ToolDef> {
                     "paths": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
                     "folder": { "type": "string" },
                     "dpi": { "type": "number", "minimum": 72, "maximum": 600 },
-                    "auto_rotate": { "type": "boolean", "default": true }, "deskew": { "type": "boolean", "default": true }, "auto_crop": { "type": "boolean", "default": false }, "crop_margin": { "type": "number", "minimum": 0, "maximum": 20, "default": 2 }, "recognize": { "type": "boolean", "default": true }, "language": { "type": "string", "enum": ["en", "de", "ja", "fr", "es"] },
+                    "auto_rotate": { "type": "boolean", "default": true }, "deskew": { "type": "boolean", "default": true }, "auto_crop": { "type": "boolean", "default": false }, "crop_margin": { "type": "number", "minimum": 0, "maximum": 20, "default": 2 }, "recognize": { "type": "boolean", "default": true }, "language": ocr_language(),
                 }),
                 &["paths", "folder"],
             )),

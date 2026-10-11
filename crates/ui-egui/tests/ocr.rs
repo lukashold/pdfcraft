@@ -32,6 +32,11 @@ fn recognize_text_dialog_adds_searchable_text() {
     h.get_by_label("Automatically rotate sideways and upside-down pages");
     h.get_by_label("Straighten skewed scans");
     assert!(h.state().ocr_draft.auto_rotate && h.state().ocr_draft.deskew);
+    h.get_by_value("English").click();
+    h.run_steps(2);
+    h.get_by_label("Italiano").click();
+    h.run_steps(2);
+    assert_eq!(h.state().ocr_draft.language, "it");
     if !pdfcraft_engine::ocr::available() {
         eprintln!("skipped: OCR models not installed");
         return;

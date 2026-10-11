@@ -27,7 +27,8 @@ pub const DICTIONARY: &str = "multilingual-dictionary.txt";
 pub const ALPHABET: &str = " 0123456789!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~€ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
 /// Supported and tested language choices (ISO 639-1).
-pub const LANGUAGES: &[(&str, &str)] = &[("en", "English"), ("de", "Deutsch"), ("ja", "日本語"), ("fr", "Français"), ("es", "Español")];
+pub const LANGUAGES: &[(&str, &str)] =
+    &[("en", "English"), ("de", "Deutsch"), ("ja", "日本語"), ("fr", "Français"), ("es", "Español"), ("it", "Italiano")];
 
 #[derive(Debug, thiserror::Error)]
 pub enum OcrError {

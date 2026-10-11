@@ -2,7 +2,7 @@
 
 **Stage: alpha** · next: beta, ~26% (ready for real work 49% → 75%) and ~400–700 h away
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-10 · **Change:** minor (localized shortcut labels, #496; readiness table with hours per audience; full number as weighted sum 49%; earlier: second look: ready 40% → 47%, mainstream 55% added; core-workflow gate applied → alpha) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** minor (preview installers with Italian OCR; localized shortcut labels, #496; readiness table with hours per audience; full number as weighted sum 49%; earlier: second look: ready 40% → 47%, mainstream 55% added; core-workflow gate applied → alpha) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
 
 PdfCraft's one-page summary: how close it is to Adobe Acrobat Pro's offline feature set, and what
 comes next. Adobe's cloud services (Document Cloud, Acrobat Sign requests, shared review, the AI
@@ -132,6 +132,10 @@ Ranked; detail and the full milestone table in [docs/roadmap.md](docs/roadmap.md
 | 8 | 1.0 polish: performance, right-to-left, missing languages, keyboard-only (M14) | 55–95 |
 
 ## Progress log
+
+- **2026-10-11 (M14, preview refresh):** Refresh the universal macOS DMG and Windows x64/ARM64 preview installers to 0.6.0-preview.20261011.2, including Italian OCR alongside the organizer and scan correction/crop features. Official release status and readiness estimates are unchanged.
+
+- **2026-10-11 (M10, Italian OCR):** Added Italiano (it) to recognition in the UI, CLI and MCP. Both OCR schemas use the engine language list. A real-model regression checks all six Italian accented vowels after save/reopen and unchanged scan pixels; UI and single/batch automation cover selection. Overall percentage unchanged.
 
 - **2026-10-11 (M14, preview packaging):** Combine the Organize overview and multilingual scan correction/crop changes for Windows x64/ARM64 MSI and macOS universal DMG preview builds. Remove trademark artwork from the distributed modified UI and carry embedded font licences in the installer. The preview is unsigned on Windows and ad-hoc signed, not notarized, on macOS; official release status and readiness estimates are unchanged.
 
@@ -324,6 +328,7 @@ Newest first: the date, what moved, and the new overall estimate.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-11 | minor | Preview installers refreshed with Italian OCR selection and accented-text save/reopen coverage; estimates unchanged |
 | 2026-10-10 | minor | Readiness table with hours per audience; full number restated as the additive weighted sum over dimensions (47% → 49%; method aligned with the standard, no new evidence) |
 | 2026-10-10 | minor | Essentials-user score added (≈ 66%) |
 | 2026-10-10 | minor | Gate consistency check: convert and share re-judged partial, not blocking; stage pre-alpha → alpha |

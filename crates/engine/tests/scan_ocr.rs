@@ -211,6 +211,24 @@ fn scan_recognizes_accents_in_requested_languages() {
 }
 
 #[test]
+fn italian_ocr_preserves_all_six_accents_after_save() {
+    if !ocr::available() {
+        eprintln!("skipped: run cargo xtask models");
+        return;
+    }
+    let (mut s, id) = scan("Lunedì visiterò la città perché è più tranquilla.", 0, 0.0);
+    let before = render(&s, id);
+    s.recognize_text(id, &[], OcrSettings { language: "it".into(), auto_rotate: false, deskew: false, ..Default::default() }).unwrap();
+    let saved = s.save_bytes(id).unwrap();
+    let reopened = s.open("italian.pdf", None, saved, None).unwrap();
+    let extracted = text(&s, reopened);
+    for expected in ["Lunedì", "visiterò", "città", "perché", "è", "più"] {
+        assert!(extracted.split_whitespace().any(|word| word == expected), "missing {expected:?}: {extracted:?}");
+    }
+    assert_eq!(before, render(&s, reopened), "searchable text must not change the scan pixels");
+}
+
+#[test]
 fn scan_recognizes_japanese_with_release_fonts() {
     if !ocr::available() || pdfcraft_fonts::CRAFT_FONTS.is_empty() {
         eprintln!("skipped: models and CRAFT_FONTS_DIR required");

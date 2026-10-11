@@ -2947,8 +2947,14 @@ fn ocr_tools_make_a_scan_searchable() {
     let mut a = auto(&dir);
     let status = ok(&mut a, "ocr_status", json!({}));
     assert_eq!(status["languages"][0]["code"], "en");
-    for language in ["de", "ja", "fr", "es"] {
+    for language in ["de", "ja", "fr", "es", "it"] {
         assert!(status["languages"].as_array().unwrap().iter().any(|l| l["code"] == language));
+    }
+    for name in ["ocr_recognize", "ocr_recognize_files"] {
+        let tool = tools().into_iter().find(|tool| tool.name == name).unwrap();
+        let advertised = &tool.input_schema["properties"]["language"]["enum"];
+        let available: Vec<_> = status["languages"].as_array().unwrap().iter().map(|language| language["code"].clone()).collect();
+        assert_eq!(advertised, &json!(available), "{name} schema must advertise the same languages as ocr_status");
     }
     if status["available"] != true {
         eprintln!("skipped: OCR models not installed");
@@ -2958,7 +2964,7 @@ fn ocr_tools_make_a_scan_searchable() {
     ok(&mut a, "doc_export_images", json!({ "doc": text, "folder": "scan", "dpi": 150, "pages": [1] }));
     let png = std::fs::read_dir(dir.join("scan")).unwrap().next().unwrap().unwrap().path();
     let scan = ok(&mut a, "doc_create", json!({ "from": "images", "paths": [png.to_string_lossy()] }))["doc"].as_u64().unwrap();
-    let r = ok(&mut a, "ocr_recognize", json!({ "doc": scan }));
+    let r = ok(&mut a, "ocr_recognize", json!({ "doc": scan, "language": "it" }));
     assert!(r["pages"][0]["text"].as_str().unwrap().to_lowercase().contains("searchable"), "{r}");
     assert!(r["words"].as_u64().unwrap() >= 4);
     let again = ok(&mut a, "ocr_recognize", json!({ "doc": scan, "pages": [1] }));
@@ -3039,7 +3045,7 @@ fn ocr_recognize_files_writes_searchable_copies() {
     let png = std::fs::read_dir(dir.join("scan")).unwrap().next().unwrap().unwrap().path();
     let scan = ok(&mut a, "doc_create", json!({ "from": "images", "paths": [png.to_string_lossy()] }))["doc"].as_u64().unwrap();
     ok(&mut a, "doc_save", json!({ "doc": scan, "path": "in/scan.pdf" }));
-    let r = ok(&mut a, "ocr_recognize_files", json!({ "paths": ["in/scan.pdf", "missing.pdf"], "folder": "out" }));
+    let r = ok(&mut a, "ocr_recognize_files", json!({ "paths": ["in/scan.pdf", "missing.pdf"], "folder": "out", "language": "it" }));
     assert!(r["files"][0]["words"].as_u64().unwrap() >= 3, "{r}");
     assert!(r["files"][1]["error"].is_string(), "{r}");
     let out = ok(&mut a, "doc_open", json!({ "path": "out/scan.pdf" }))["doc"].as_u64().unwrap();
