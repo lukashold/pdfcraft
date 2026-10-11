@@ -51,7 +51,7 @@ fn japanese_ui_text_uses_craft_fonts() {
 /// In Simplified and Traditional Chinese the CJK fallback starts with that script's faces, so a
 /// line takes Chinese glyph shapes and never mixes faces with different vertical metrics; in every
 /// other language the Japanese faces still lead. A build with craft-fonts but no allowed Chinese
-/// face fails here rather than skipping (#651: that is how tofu shipped with green CI).
+/// face fails here rather than skipping (that is how the tofu of #499 shipped with CI green).
 #[test]
 fn chinese_ui_text_prefers_the_chinese_face() {
     if pdfcraft_fonts::CRAFT_FONTS.is_empty() {
@@ -170,6 +170,28 @@ fn system_fallback_fills_missing_scripts() {
         assert!(fonts.has_glyphs(&id, "PdfCraft"), "{id:?}");
     }
     assert!(layout_widths(&mut fonts, ARABIC).iter().all(|w| w.is_finite() && *w > 0.0));
+}
+
+/// #882: a Chinese interface in a build without an embedded Chinese face (no craft-fonts, a
+/// source build) takes an installed Chinese face as its last fallback when the machine has one,
+/// so Simplified-only characters aren't boxes; with the embedded face it isn't needed.
+#[test]
+fn a_chinese_interface_without_an_embedded_face_uses_an_installed_one() {
+    for (cjk, text, embedded) in [
+        (CjkPreference::Simplified, SIMPLIFIED, !pdfcraft_fonts::ui_simplified_chinese_fonts().is_empty()),
+        (CjkPreference::Traditional, TRADITIONAL, !pdfcraft_fonts::ui_traditional_chinese_fonts().is_empty()),
+    ] {
+        let defs = theme::installed_font_definitions(cjk);
+        let installed = defs.font_data.contains_key(theme::SYSTEM_FALLBACK);
+        let mut fonts = Fonts::new(TextOptions::default(), defs);
+        if !embedded && !installed {
+            eprintln!("skipping the {cjk:?} system-face check: no embedded or installed Chinese face (or PDFCRAFT_SYSTEM_FONTS=0)");
+            continue;
+        }
+        for id in families() {
+            assert!(fonts.has_glyphs(&id, text), "{cjk:?}: {id:?} lacks a glyph of {text} (embedded {embedded}, installed {installed})");
+        }
+    }
 }
 
 /// Without craft-fonts the interface fonts still install and lay out any text (Japanese falls

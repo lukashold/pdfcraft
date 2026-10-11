@@ -148,13 +148,20 @@ pub const SYSTEM_FALLBACK: &str = "system-fallback";
 
 /// What [`install_fonts_for`] installs: [`font_definitions_for`], then, on desktop, one face
 /// already installed on this machine as the last fallback of every family. It only draws
-/// characters no embedded face has (an Arabic file name in a build without craft-fonts);
-/// `PDFCRAFT_SYSTEM_FONTS=0` leaves it out.
+/// characters no embedded face has: an Arabic file name in a build without craft-fonts, or, in a
+/// Chinese interface the build has no Chinese face for, the interface itself (an installed
+/// PingFang, Microsoft YaHei or WenQuanYi, #882). `PDFCRAFT_SYSTEM_FONTS=0` leaves it out.
 pub fn installed_font_definitions(cjk: CjkPreference) -> FontDefinitions {
     #[cfg_attr(target_arch = "wasm32", expect(unused_mut))]
     let mut fonts = font_definitions_for(cjk);
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(data) = crate::system_fonts::fallback() {
+    let need = crate::system_fonts::need_for(
+        cjk,
+        !pdfcraft_fonts::ui_simplified_chinese_fonts().is_empty(),
+        !pdfcraft_fonts::ui_traditional_chinese_fonts().is_empty(),
+    );
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(data) = crate::system_fonts::fallback(need) {
         fonts.font_data.insert(SYSTEM_FALLBACK.to_owned(), data);
         for stack in fonts.families.values_mut() {
             stack.push(SYSTEM_FALLBACK.to_owned());
