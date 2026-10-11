@@ -2216,3 +2216,18 @@ key	Space	Espace
 	Rotate page {label} counterclockwise	Faire pivoter la page {label} dans le sens antihoraire
 	Rotate page {label} clockwise	Faire pivoter la page {label} dans le sens horaire
 	Delete page {label}	Supprimer la page {label}
+	Text style	Style de texte
+	Modern print	Texte imprimé moderne
+	Historical print (Fraktur)	Texte imprimé ancien (Fraktur)
+	Fraktur and Kurrent use an optional 13 MB add-on. After download, recognition works offline.	Fraktur et Kurrent utilisent un module facultatif de 13 Mo. Après le téléchargement, la reconnaissance fonctionne hors ligne.
+	Historical spelling is preserved. Handwriting, abbreviations and complex layouts need checking.	L’orthographe historique est conservée. Vérifiez les manuscrits, les abréviations et les mises en page complexes.
+	Preparing OCR add-on…	Préparation du module OCR…
+	Historical OCR add-on installed	Module OCR historique installé
+	Remove add-on	Supprimer le module
+	Download historical OCR add-on (13 MB)	Télécharger le module OCR historique (13 Mo)
+	Historical OCR add-ons require the desktop app.	Les modules OCR historiques nécessitent l’application de bureau.
+	Wait for text recognition to finish before changing add-ons	Attendez la fin de la reconnaissance de texte avant de modifier les modules
+	Automatic (historical model)	Automatique (modèle historique)
+	The historical model detects its supported scripts automatically; Japanese is not included.	Le modèle historique détecte automatiquement les écritures prises en charge ; le japonais n’est pas inclus.
+	Historical handwriting (Kurrent)	Écriture manuscrite ancienne (Kurrent)
+	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	L’écriture manuscrite nécessite des lignes horizontales à l’endroit dans une seule colonne. Les colonnes multiples, tableaux et notes marginales ne sont pas pris en charge.

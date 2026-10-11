@@ -18,9 +18,22 @@ pub mod commands;
 pub mod compare;
 pub mod dates;
 pub mod export;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod hot_folder;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod hot_folder_analysis;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod hot_folder_output;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod hot_folder_preprocess;
+#[cfg(not(target_arch = "wasm32"))]
+mod hot_folder_schedule;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod hot_folder_sources;
 pub mod js;
 pub mod links;
 pub mod ocr;
+pub mod ocr_addons;
 mod ocr_pdf;
 pub mod optimizer;
 pub mod signature_image;

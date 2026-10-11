@@ -2214,3 +2214,18 @@ key	Space	Szóköz
 	Rotate page {label} counterclockwise	{label}. oldal elforgatása az óramutató járásával ellentétesen
 	Rotate page {label} clockwise	{label}. oldal elforgatása az óramutató járásával megegyezően
 	Delete page {label}	{label}. oldal törlése
+	Text style	Szövegstílus
+	Modern print	Modern nyomtatott szöveg
+	Historical print (Fraktur)	Történelmi nyomtatott szöveg (fraktúr)
+	Fraktur and Kurrent use an optional 13 MB add-on. After download, recognition works offline.	A fraktúr és a kurrent egy választható, 13 MB-os bővítményt használ. A letöltés után a felismerés internet nélkül működik.
+	Historical spelling is preserved. Handwriting, abbreviations and complex layouts need checking.	A történelmi helyesírás megmarad. A kézírást, rövidítéseket és összetett elrendezéseket ellenőrizni kell.
+	Preparing OCR add-on…	OCR-bővítmény előkészítése…
+	Historical OCR add-on installed	Történelmi OCR-bővítmény telepítve
+	Remove add-on	Bővítmény eltávolítása
+	Download historical OCR add-on (13 MB)	Történelmi OCR-bővítmény letöltése (13 MB)
+	Historical OCR add-ons require the desktop app.	A történelmi OCR-bővítményekhez az asztali alkalmazás szükséges.
+	Wait for text recognition to finish before changing add-ons	A bővítmények módosítása előtt várja meg a szövegfelismerés befejezését
+	Automatic (historical model)	Automatikus (történelmi modell)
+	The historical model detects its supported scripts automatically; Japanese is not included.	A történelmi modell automatikusan felismeri a támogatott írásokat; a japán nem tartozik közéjük.
+	Historical handwriting (Kurrent)	Történelmi kézírás (kurrent)
+	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	A kézíráshoz helyes irányú, vízszintes sorok szükségesek egyetlen szövegoszlopban. Több oszlop, táblázatok és széljegyzetek nem támogatottak.

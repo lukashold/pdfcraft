@@ -354,10 +354,14 @@ impl PdfCraftApp {
             "export.text" => self.dialog = Some(Dialog::Export(crate::export_ui::ExportKind::Text)),
             "a11y.check" => self.start_accessibility_check(),
             "ocr.recognize" => {
+                self.ocr_addon.status = None;
+                self.ocr_addon.message = None;
                 self.ocr_draft.recognize = true;
                 self.dialog = Some(Dialog::RecognizeText);
             }
             "ocr.enhance" => {
+                self.ocr_addon.status = None;
+                self.ocr_addon.message = None;
                 self.ocr_draft.recognize = false;
                 self.ocr_draft.auto_crop = true;
                 self.dialog = Some(Dialog::RecognizeText);

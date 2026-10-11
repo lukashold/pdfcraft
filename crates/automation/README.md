@@ -68,6 +68,18 @@ moves 1–1000 references atomically in displayed points (right/down), preservin
 and fonts. A refusal changes nothing; success is one undo step. See
 [the selection and movement guide](../../docs/editing-multiple-objects.md) for limits and examples.
 
+## Hot Folder
+
+The native `hot_folder_configure`, `hot_folder_status`, `hot_folder_poll`, `hot_folder_retry`
+and `hot_folder_run_now` tools share the standalone application's durable engine. Configuration
+contains named tasks, existing disjoint folders, OCR options and interval or calendar schedules.
+All nested paths and sidecars honour `--root`. Poll does one bounded scheduler pass; no tool
+implicitly starts a service or background process. `hot_folder_project` writes ordered open
+project manifests; `hot_folder_source` provides explicit remote authentication and folder discovery.
+FTP passwords enter through named environment variables, never through replayable tool arguments.
+`hot_folder_service` explicitly controls an installed boot service and refuses mutations under
+`--root`. See [the configuration and scope guide](../../docs/hot-folder.md).
+
 ## Common command tools
 
 Following FilmCraft's MCP conventions, `command_list {doc?, filter?, enabled_only?}` keeps its

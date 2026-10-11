@@ -23,10 +23,39 @@ env:
   CARGO_INCREMENTAL: 0
   RUST_BACKTRACE: 1
   PDFCRAFT_BUILD_SHA: ${{ github.sha }}
-  PDFCRAFT_VERSION: 0.6.0-preview.20261011.3
+  PDFCRAFT_VERSION: 0.6.0-preview.20261011.4
   PDFCRAFT_SYSTEM_FONTS: '0'
 
 jobs:
+  linux-processing:
+    name: Linux processing and service credentials
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: preview-linux-processing
+          cache-on-failure: true
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libdbus-1-dev libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libgtk-3-dev
+      - name: Fetch standard OCR models
+        run: cargo xtask models
+      - name: Exercise processing, automation and export
+        run: |
+          cargo test -p pdfcraft-engine hot_folder
+          cargo test -p pdfcraft-automation --test hot_folder
+          cargo test -p pdfcraft-export
+      - name: Verify root provisioning preserves service ownership
+        run: |
+          cargo test -p pdfcraft-engine --lib --no-run --message-format=json > "$RUNNER_TEMP/engine-tests.json"
+          test_binary="$(jq -rs '[.[] | select(.reason == "compiler-artifact" and .profile.test == true and .target.name == "pdfcraft_engine") | .executable | select(. != null)] | last // empty' "$RUNNER_TEMP/engine-tests.json")"
+          test -n "$test_binary"
+          sudo "$test_binary" --exact hot_folder_sources::credentials::tests::unix_admin_provisioning_preserves_service_uid_gid_and_private_modes --ignored
+
   windows:
     name: Windows ${{ matrix.arch }} MSI
     runs-on: windows-latest
@@ -78,7 +107,7 @@ jobs:
           if-no-files-found: error
 
   macos:
-    name: macOS universal DMG (Intel + Apple Silicon)
+    name: macOS universal DMG and optional Hot Folder PKG
     runs-on: macos-15
     timeout-minutes: 120
     steps:
@@ -96,7 +125,7 @@ jobs:
         with:
           key: preview-macos-universal
           cache-on-failure: true
-      - name: Build and verify ad-hoc signed DMG with OCR models
+      - name: Build and verify ad-hoc signed apps, DMG and optional-component PKG
         env:
           CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
           CRAFT_FONTS_REQUIRED: '1'
@@ -104,13 +133,15 @@ jobs:
       - name: Verify both architectures and compute checksum
         run: |
           lipo target/macos-package/bin/pdfcraft -verify_arch arm64 x86_64
+          lipo target/macos-package/bin/pdfcraft-hot-folder -verify_arch arm64 x86_64
           cd dist/release
-          shasum -a 256 *.dmg > SHA256SUMS.txt
+          shasum -a 256 *.dmg *.pkg > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: pdfcraft-preview-macos-universal
           path: |
             dist/release/*.dmg
+            dist/release/*.pkg
             dist/release/SHA256SUMS.txt
           retention-days: 14
           if-no-files-found: error

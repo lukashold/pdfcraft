@@ -18,3 +18,8 @@ rten-tensor = "0.26.0"
 rten-imageproc = "0.26.0"
 image = { version = "0.25", default-features = false }
 thiserror.workspace = true
+serde_json.workspace = true
+unicode-normalization = "0.1.25"
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }

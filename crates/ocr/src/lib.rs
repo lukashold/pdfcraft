@@ -9,6 +9,8 @@
 
 use std::path::{Path, PathBuf};
 pub mod crop;
+mod handwriting;
+pub mod historical;
 mod multilingual;
 pub mod scan;
 
@@ -196,17 +198,41 @@ impl Ocr {
         if !LANGUAGES.iter().any(|l| l.0 == language) {
             return Err(OcrError::Recognize(format!("unsupported language: {language}")));
         }
+        Self::recognize_lines(self.line_regions(image)?, |rect| self.multilingual.read_line(image, rect))
+    }
+
+    /// Recognize historical print with an explicitly installed add-on.
+    /// Detection and output coordinates use the same path as ordinary recognition.
+    pub fn recognize_historical(&self, image: &image::RgbImage, historical: &historical::Historical) -> Result<Vec<Line>, OcrError> {
+        let regions = historical::line_regions(self.line_regions(image)?, image.dimensions());
+        Self::recognize_lines(regions, |rect| historical.read_line(image, rect))
+    }
+
+    /// Recognize upright historical handwriting in a single text column.
+    pub fn recognize_handwriting(&self, image: &image::RgbImage, historical: &historical::Historical) -> Result<Vec<Line>, OcrError> {
+        Self::recognize_lines(handwriting::lines(image)?, |rect| historical.read_line(image, rect))
+    }
+
+    fn line_regions(&self, image: &image::RgbImage) -> Result<Vec<[f32; 4]>, OcrError> {
         use rten_imageproc::BoundingRect;
         let source = ocrs::ImageSource::from_bytes(image.as_raw(), image.dimensions()).map_err(|e| OcrError::Recognize(e.to_string()))?;
         let input = self.engine.prepare_input(source).map_err(|e| OcrError::Recognize(e.to_string()))?;
         let found = self.engine.detect_words(&input).map_err(|e| OcrError::Recognize(e.to_string()))?;
         let boxes = self.engine.find_text_lines(&input, &found);
-        let mut out = Vec::new();
+        let mut regions = Vec::new();
         for line in boxes {
             let rect = line.iter().map(|r| r.bounding_rect()).fold([f32::INFINITY, f32::INFINITY, 0.0f32, 0.0f32], |a, r| {
                 [a[0].min(r.left()), a[1].min(r.top()), a[2].max(r.right()), a[3].max(r.bottom())]
             });
-            let words = self.multilingual.read_line(image, rect)?;
+            regions.push(rect);
+        }
+        Ok(regions)
+    }
+
+    fn recognize_lines(regions: Vec<[f32; 4]>, read_line: impl Fn([f32; 4]) -> Result<Vec<Word>, OcrError>) -> Result<Vec<Line>, OcrError> {
+        let mut out = Vec::new();
+        for rect in regions {
+            let words = read_line(rect)?;
             if !words.is_empty() {
                 out.push(Line { words });
             }

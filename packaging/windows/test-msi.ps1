@@ -145,6 +145,35 @@ try {
 if ($modelFiles -lt 2) { throw "expected the OCR models (*.rten) in models\, found $modelFiles" }
 $rm = Read-Row 'SELECT `Dialog` FROM `Dialog` WHERE `Dialog` = ''MsiRMFilesInUse''' 1
 Assert-Equal $rm[0] 'MsiRMFilesInUse' 'Files-in-use dialog'
+# The companion is opt-in and belongs to a separate feature. Its service runs at boot
+# under LocalService, never an interactive user's credentials or LocalSystem.
+$feature = Read-Row 'SELECT `Level` FROM `Feature` WHERE `Feature` = ''HotFolder''' 1
+Assert-Equal $feature[0] '2' 'Hot Folder default feature level'
+Assert-NoRow 'SELECT `Value` FROM `Property` WHERE `Property` = ''INSTALLHOTFOLDER''' 'Hot Folder enabled by default'
+if (($secure[0] -split ';') -notcontains 'INSTALLHOTFOLDER') { throw 'Hot Folder choice is not secure' }
+$choice = Read-Row 'SELECT `Type`, `Property` FROM `Control` WHERE `Dialog_` = ''InstallWelcome'' AND `Control` = ''HotFolder''' 2
+Assert-Equal $choice[0] 'CheckBox' 'Hot Folder optional checkbox'
+Assert-Equal $choice[1] 'INSTALLHOTFOLDER' 'Hot Folder checkbox property'
+$service = Read-Row 'SELECT `ServiceType`, `StartType`, `StartName`, `Arguments`, `Component_` FROM `ServiceInstall` WHERE `Name` = ''PdfCraftHotFolder''' 5
+Assert-Equal $service[0] '16' 'Hot Folder own-process service'
+Assert-Equal $service[1] '2' 'Hot Folder automatic boot startup'
+Assert-Equal $service[2] 'NT AUTHORITY\LocalService' 'Hot Folder restricted service account'
+Assert-Equal $service[3] '--service --config "[HotFolderData]tasks.json"' 'Service configuration arguments'
+Assert-Equal $service[4] 'PdfcraftHotFolderApp' 'Service executable component'
+$control = Read-Row 'SELECT `Event`, `Wait` FROM `ServiceControl` WHERE `Name` = ''PdfCraftHotFolder''' 2
+Assert-Equal $control[0] '163' 'Start on install, stop on upgrade/removal, delete on uninstall'
+Assert-Equal $control[1] '1' 'Wait for graceful service stop'
+$acl = Read-Row 'SELECT `SDDLText` FROM `MsiLockPermissionsEx` WHERE `LockObject` = ''HotFolderData''' 1
+Assert-Equal $acl[0] 'D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-19)(A;OICI;GRGX;;;BU)' 'Protected task directory'
+$secrets = Read-Row 'SELECT `SDDLText` FROM `MsiLockPermissionsEx` WHERE `LockObject` = ''HotFolderSecrets''' 1
+Assert-Equal $secrets[0] 'D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-19)' 'Credentials must not be readable by ordinary users'
+$shortcut = Read-Row 'SELECT `Target`, `Arguments` FROM `Shortcut` WHERE `Shortcut` = ''HotFolderStartMenuShortcut''' 2
+Assert-Equal $shortcut[0] '[#PdfcraftHotFolderExe]' 'Hot Folder shortcut executable'
+Assert-Equal $shortcut[1] '--config "[HotFolderData]tasks.json"' 'GUI and service use the same tasks'
+foreach ($action in @(@('AddHotFolder', 'AddLocal'), @('RemoveHotFolder', 'Remove'))) {
+  $event = Read-Row ('SELECT `Argument` FROM `ControlEvent` WHERE `Dialog_` = ''InstallMaintenance'' AND `Control_` = ''' + $action[0] + ''' AND `Event` = ''' + $action[1] + '''') 1
+  Assert-Equal $event[0] 'HotFolder' "$($action[0]) feature action"
+}
 [void] [Runtime.InteropServices.Marshal]::FinalReleaseComObject($Database)
 [void] [Runtime.InteropServices.Marshal]::FinalReleaseComObject($Installer)
 Write-Output 'ok MSI: per-machine scope guard, publisher, persistent progress text, Start Menu shortcut, optional desktop shortcut (default on, checkbox), icon/key path, full-UI success/cancel/error and Finish controls, files-in-use dialog, OCR models'

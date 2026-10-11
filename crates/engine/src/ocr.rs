@@ -14,13 +14,47 @@ pub use pdfcraft_ocr::{LANGUAGES, Models, Ocr, OcrError, PlacedWord, language_fo
 
 use crate::{DocId, Edit, EditError, Session};
 
+/// Recognition is independent of the document language. Historical recognition
+/// requires an optional model download; choosing it never initiates a download.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(not(target_arch = "wasm32"), serde(rename_all = "kebab-case"))]
+pub enum Recognizer {
+    #[default]
+    Modern,
+    Historical,
+    HistoricalHandwriting,
+}
+
+impl Recognizer {
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Modern => "modern",
+            Self::Historical => "historical",
+            Self::HistoricalHandwriting => "historical-handwriting",
+        }
+    }
+
+    pub fn from_id(value: &str) -> Result<Self, String> {
+        match value {
+            "modern" => Ok(Self::Modern),
+            "historical" => Ok(Self::Historical),
+            "historical-handwriting" => Ok(Self::HistoricalHandwriting),
+            _ => Err(format!("unsupported OCR recognizer: {value}; expected modern, historical or historical-handwriting")),
+        }
+    }
+}
+
 /// Recognize Text settings.
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(not(target_arch = "wasm32"), serde(default, deny_unknown_fields))]
 pub struct OcrSettings {
     /// Resolution pages are rendered at for recognition (Acrobat's "Downsample to" choices).
     pub dpi: f32,
     /// Language code from [`LANGUAGES`]; recognized using the multilingual model.
     pub language: String,
+    pub recognizer: Recognizer,
     /// Leave pages that already have text alone (Acrobat reports "page contains renderable
     /// text" and skips them).
     pub skip_text_pages: bool,
@@ -39,6 +73,7 @@ impl Default for OcrSettings {
         OcrSettings {
             dpi: 300.0,
             language: "en".into(),
+            recognizer: Recognizer::Modern,
             skip_text_pages: true,
             auto_rotate: true,
             deskew: true,
@@ -101,6 +136,12 @@ pub fn available() -> bool {
     Models::find().is_some()
 }
 
+/// Load the optional, checksum-verified historical model without network access.
+pub fn historical_engine() -> Result<pdfcraft_ocr::historical::Historical, String> {
+    let dir = crate::ocr_addons::historical_dir()?;
+    pdfcraft_ocr::historical::Historical::load(&dir).map_err(|error| error.to_string())
+}
+
 /// Everything recognition needs from a document, detached from the session.
 pub struct OcrJob {
     bytes: Arc<Vec<u8>>,
@@ -138,11 +179,26 @@ impl OcrJob {
         {
             return failure("invalid OCR language, resolution or crop margin (0..20 pt)");
         }
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.run_inner(ocr, progress)))
-            .unwrap_or_else(|_| failure("scan processing failed safely; the document was not changed"))
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let historical = if self.settings.recognize && self.settings.recognizer != Recognizer::Modern {
+                match historical_engine() {
+                    Ok(model) => Some(model),
+                    Err(why) => return failure(&why),
+                }
+            } else {
+                None
+            };
+            self.run_inner(ocr, historical.as_ref(), progress)
+        }))
+        .unwrap_or_else(|_| failure("scan processing failed safely; the document was not changed"))
     }
 
-    fn run_inner(&self, ocr: &Ocr, mut progress: impl FnMut(usize, usize) -> bool) -> Vec<OcrPage> {
+    fn run_inner(
+        &self,
+        ocr: &Ocr,
+        historical: Option<&pdfcraft_ocr::historical::Historical>,
+        mut progress: impl FnMut(usize, usize) -> bool,
+    ) -> Vec<OcrPage> {
         let config = RenderConfig { password: self.password.as_deref().map(Arc::from), ..Default::default() };
         let mut r = PageRenderer::new(self.bytes.clone(), config);
         let mut out = Vec::new();
@@ -219,7 +275,17 @@ impl OcrJob {
                 correction.deskew = pdfcraft_ocr::scan::deskew(&turned);
             }
             let corrected = Correction { rotation: 0, ..correction }.apply(&turned);
-            let result = if self.settings.recognize { ocr.recognize_language(&corrected, &self.settings.language) } else { Ok(Vec::new()) };
+            let result = if !self.settings.recognize {
+                Ok(Vec::new())
+            } else if let Some(historical) = historical {
+                if self.settings.recognizer == Recognizer::HistoricalHandwriting {
+                    ocr.recognize_handwriting(&corrected, historical)
+                } else {
+                    ocr.recognize_historical(&corrected, historical)
+                }
+            } else {
+                ocr.recognize_language(&corrected, &self.settings.language)
+            };
             let lines = match result {
                 Ok(l) => l,
                 Err(e) => {

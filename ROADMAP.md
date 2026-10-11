@@ -2,7 +2,7 @@
 
 **Stage: alpha** · next: beta, ~26% (ready for real work 49% → 75%) and ~400–700 h away
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** minor (preview installers with additional OCR languages and system-language defaults; localized shortcut labels, #496; readiness table with hours per audience; full number as weighted sum 49%; earlier: second look: ready 40% → 47%, mainstream 55% added; core-workflow gate applied → alpha) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** minor (combined preview with organizer, historical OCR and Hot Folder; additional OCR languages and system-language default; localized shortcut labels, #496; readiness table with hours per audience; full number as weighted sum 49%; earlier: second look: ready 40% → 47%, mainstream 55% added; core-workflow gate applied → alpha) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
 
 PdfCraft's one-page summary: how close it is to Adobe Acrobat Pro's offline feature set, and what
 comes next. Adobe's cloud services (Document Cloud, Acrobat Sign requests, shared review, the AI
@@ -133,7 +133,12 @@ Ranked; detail and the full milestone table in [docs/roadmap.md](docs/roadmap.md
 
 ## Progress log
 
+- **2026-10-11 (M14, combined preview .4):** Integrate optional historical OCR and the standalone Hot Folder application into Windows x64/ARM64 and universal macOS preview packaging. Preserve fork branding, embedded-font notices and opt-in model downloads. The shared OCR settings retain historical profile IDs through task JSON while older tasks default to modern recognition.
+
 - **2026-10-11 (M14, final preview refresh):** Build 0.6.0-preview.20261011.3 installers with all twelve OCR language choices and system-language defaults, retaining the organizer and scan correction/crop features. Preview signing and official release status are unchanged.
+
+- **2026-10-11 (M10, optional historical OCR):** Fraktur and Kurrent recognition can be downloaded as a separate 13 MB add-on. Pinned Apache-2.0 weights run offline through Rust/RTen; the scan dialog and automation expose explicit install/status/removal. Unicode text, scan pixels, save/reopen and undo are covered. The public historical regression samples overlap model training, so they demonstrate integration and conversion fidelity, not general handwriting accuracy. Overall percentage unchanged.
+- 2026-10-11 — M13: optional standalone Hot Folder with durable local/network/FTP/Outlook/open-project processing, calendar schedules, safe source policies, OCR/scan preprocessing, analysis reports, grouped PDF/Office/image/EPUB outputs, headless tools and seven UI languages. Restricted-account boot services and optional Windows/macOS/Linux installers have lifecycle coverage; proprietary ABBYY formats remain incompatible; see [the scope inventory](docs/hot-folder.md).
 
 - **2026-10-11 (M10, OCR languages and defaults):** Fold Dutch, Danish, Norwegian Bokmål, Swedish, Finnish and Portuguese into the scan/OCR work, with save/reopen regressions for accented words. The UI selects the primary system/browser language, independently of UI translations, with English fallback; manual selection remains available. Icelandic stays unclaimed. Overall percentage unchanged.
 
@@ -332,6 +337,7 @@ Newest first: the date, what moved, and the new overall estimate.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-11 | minor | Optional historical Fraktur/Kurrent recognition with explicit model management and offline inference; estimates unchanged |
 | 2026-10-11 | minor | Additional Latin OCR languages and system-language default with English fallback; estimates unchanged |
 | 2026-10-11 | minor | Italian OCR selection and accented-text save/reopen coverage; estimates unchanged |
 

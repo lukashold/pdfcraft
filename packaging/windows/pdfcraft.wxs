@@ -9,7 +9,7 @@
   and in Default apps, never forced as the default). Files opened with PdfCraft arrive on its
   command line.
 -->
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package
       Name="PdfCraft"
       Manufacturer="lukashold (preview build)"
@@ -40,6 +40,13 @@
          INSTALLDESKTOPSHORTCUT=0 on the msiexec command line for unattended installs. Secure, so the
          choice made in the (unelevated) UI reaches the elevated install. -->
     <Property Id="INSTALLDESKTOPSHORTCUT" Value="1" Secure="yes" />
+    <!-- Opt-in companion. INSTALLHOTFOLDER=1 also works for unattended deployment. -->
+    <Property Id="INSTALLHOTFOLDER" Secure="yes" />
+    <Property Id="HOTFOLDERPRESENT" Secure="yes">
+      <RegistrySearch Id="ExistingHotFolder" Root="HKLM" Key="Software\PdfCraft\HotFolder" Name="TaskFile" Type="raw" />
+    </Property>
+    <SetProperty Id="INSTALLHOTFOLDER" Value="1" After="AppSearch" Sequence="both"
+        Condition="HOTFOLDERPRESENT AND NOT INSTALLHOTFOLDER" />
     <UIRef Id="PdfcraftInstallerUI" />
 
     <StandardDirectory Id="ProgramFiles6432Folder">
@@ -49,14 +56,65 @@
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder" />
     <StandardDirectory Id="DesktopFolder" />
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="PdfcraftProgramData" Name="PdfCraft">
+        <Directory Id="HotFolderData" Name="HotFolder">
+          <Directory Id="HotFolderSecrets" Name="secrets" />
+        </Directory>
+      </Directory>
+    </StandardDirectory>
 
     <Feature Id="Main" Title="PdfCraft" Level="1">
       <ComponentGroupRef Id="PdfcraftFiles" />
       <ComponentGroupRef Id="PdfcraftModels" />
     </Feature>
+    <Feature Id="HotFolder" Title="PdfCraft Hot Folder"
+        Description="Automatically process configured folders in the background." Level="2" AllowAdvertise="no">
+      <Level Value="1" Condition="INSTALLHOTFOLDER = 1" />
+      <ComponentGroupRef Id="PdfcraftHotFolderFiles" />
+    </Feature>
   </Package>
 
   <Fragment>
+    <ComponentGroup Id="PdfcraftHotFolderFiles" Directory="INSTALLFOLDER">
+      <Component Id="PdfcraftHotFolderApp" Guid="BB2EC64C-7ADB-4D81-A11D-7FBA0A37BB9A">
+        <File Id="PdfcraftHotFolderExe" Source="$(var.BinDir)\pdfcraft-hot-folder.exe" KeyPath="yes" />
+        <ServiceInstall Id="HotFolderService" Name="PdfCraftHotFolder" DisplayName="PdfCraft Hot Folder"
+            Description="Processes explicitly enabled PDF and image folder tasks at system startup."
+            Type="ownProcess" Start="auto" ErrorControl="normal" Vital="yes"
+            Account="NT AUTHORITY\LocalService"
+            Arguments="--service --config &quot;[HotFolderData]tasks.json&quot;">
+          <util:ServiceConfig FirstFailureActionType="restart" SecondFailureActionType="restart"
+              ThirdFailureActionType="none" ResetPeriodInDays="1" RestartServiceDelayInSeconds="10" />
+        </ServiceInstall>
+        <ServiceControl Id="HotFolderServiceControl" Name="PdfCraftHotFolder"
+            Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+      </Component>
+      <Component Id="PdfcraftHotFolderSecrets" Directory="HotFolderSecrets" Guid="4D641968-81D3-474E-867D-C03E18E80584">
+        <CreateFolder>
+          <PermissionEx Sddl="D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-19)" />
+        </CreateFolder>
+        <RegistryValue Root="HKLM" Key="Software\PdfCraft\HotFolder" Name="SecretsDirectory"
+            Type="string" Value="[HotFolderSecrets]" KeyPath="yes" />
+      </Component>
+      <Component Id="PdfcraftHotFolderData" Directory="HotFolderData" Guid="6A9F747C-23E8-4242-9779-157B44B4CBF0">
+        <!-- An unelevated user may inspect task state, but only administrators and the
+             restricted service account can change the configured work. Keep user tasks on uninstall. -->
+        <CreateFolder>
+          <PermissionEx Sddl="D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-19)(A;OICI;GRGX;;;BU)" />
+        </CreateFolder>
+        <RegistryValue Root="HKLM" Key="Software\PdfCraft\HotFolder" Name="TaskFile"
+            Type="string" Value="[HotFolderData]tasks.json" KeyPath="yes" />
+      </Component>
+      <Component Id="PdfcraftHotFolderShortcut" Directory="ProgramMenuFolder" Guid="3750C6ED-93C7-430E-9DAD-873060F5CF38">
+        <Shortcut Id="HotFolderStartMenuShortcut" Name="PdfCraft Hot Folder"
+            Description="Configure automatic OCR and scan processing"
+            Target="[#PdfcraftHotFolderExe]" Arguments="--config &quot;[HotFolderData]tasks.json&quot;" WorkingDirectory="INSTALLFOLDER"
+            Icon="PdfcraftIcon.ico" IconIndex="0" />
+        <RegistryValue Root="HKLM" Key="Software\PdfCraft\Shortcuts" Name="HotFolder" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
     <ComponentGroup Id="PdfcraftFiles" Directory="INSTALLFOLDER">
       <Component Id="PdfcraftApp" Guid="E724C1C6-091F-4E21-A685-80D089FDBE21">
         <File Id="PdfcraftExe" Source="$(var.BinDir)\pdfcraft.exe" KeyPath="yes" />

@@ -6442,6 +6442,18 @@ evidence = ["crates/engine/tests/scan_ocr.rs::scan_recognizes_accents_in_request
 notes = "English, German, French, Spanish, Italian, Dutch, Danish, Norwegian Bokmål, Swedish, Finnish, Portuguese and horizontal Japanese run offline. The UI initially selects the primary system/browser locale, with English fallback when unavailable or unsupported; manual choices remain available. CLI/MCP language arguments retain their deterministic English default. Icelandic, other language choices and vertical Japanese remain unclaimed."
 
 [[feature]]
+id = "ocr.historical-scripts"
+title = "Optional historical print and handwriting recognition"
+area = "I"
+tier = "P1"
+milestone = "M10"
+status = "partial"
+commands = ["ocr.recognize"]
+tools = ["ocr_recognize", "ocr_recognize_files", "ocr_addon_status", "ocr_addon_install", "ocr_addon_remove"]
+evidence = ["crates/engine/tests/scan_ocr.rs::historical_fraktur_and_kurrent_scans_roundtrip_through_the_engine", "crates/engine/tests/scan_ocr.rs::historical_handwriting_full_page_is_searchable_after_save_and_undo", "crates/engine/tests/scan_ocr.rs::historical_addon_recognition_preserves_pixels_unicode_save_and_undo", "crates/automation/tests/automation.rs::historical_ocr_tools_report_status_and_enforce_the_root", "crates/automation/tests/automation.rs::historical_ocr_automation_makes_a_scan_searchable", "crates/ui-egui/tests/ocr.rs::historical_ocr_choice_requires_an_explicit_addon_download"]
+notes = "Explicit optional 13 MB historical PP-OCRv6 add-on (Apache-2.0); pinned size/SHA-256, per-user installation and removal, offline Rust/RTen inference. Separate historical print and single-column handwriting profiles. Fraktur and Kurrent samples exercise full-page recognition, Unicode, save/reopen and undo; the public samples overlap training sources and are not a general accuracy benchmark. Historical spelling is retained. Handwriting requires upright horizontal lines in one column; tables, marginal notes, complex layouts, arbitrary writers and historical Japanese are unclaimed. See docs/historical-ocr.md."
+
+[[feature]]
 id = "ocr.searchable-image"
 title = "Searchable image output (invisible text layer)"
 area = "I"
@@ -10060,3 +10072,15 @@ commands = []
 tools = []
 evidence = []
 notes = ""
+
+[[feature]]
+id = "misc.hot-folder"
+title = "Standalone watched-folder document processing"
+area = "N"
+tier = "P1"
+milestone = "M13"
+status = "partial"
+commands = []
+tools = ["hot_folder_configure", "hot_folder_status", "hot_folder_poll", "hot_folder_retry", "hot_folder_run_now", "hot_folder_source", "hot_folder_project", "hot_folder_service"]
+evidence = ["crates/engine/src/hot_folder.rs::hot_folder_settling_and_durable_receipts_prevent_duplicates_and_overwrites", "crates/automation/tests/hot_folder.rs::hot_folder_tools_produce_searchable_output_and_preserve_source", "apps/pdfcraft-hot-folder/src/ui.rs::hot_folder_ui_has_seven_languages_and_persists_a_stopped_task"]
+notes = "Separate native application: local/network/FTP/Outlook/open-project sources, PDF/images, durable receipts, calendar scheduling, OCR and scan preprocessing, JSON analysis without OCR, grouped PDF/Office/XLSX/EPUB/image outputs, safe source policies, task import/export and seven UI languages. Boot services use restricted accounts. Full proprietary project/output parity remains partial; see docs/hot-folder.md. No implicit service or MCP startup."

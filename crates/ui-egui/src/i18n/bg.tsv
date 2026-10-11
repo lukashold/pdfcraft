@@ -2178,3 +2178,18 @@ key	Space	Интервал
 	Rotate page {label} counterclockwise	Завъртане на страница {label} обратно на часовниковата стрелка
 	Rotate page {label} clockwise	Завъртане на страница {label} по часовниковата стрелка
 	Delete page {label}	Изтриване на страница {label}
+	Text style	Стил на текста
+	Modern print	Съвременен печатен текст
+	Historical print (Fraktur)	Исторически печатен текст (Fraktur)
+	Fraktur and Kurrent use an optional 13 MB add-on. After download, recognition works offline.	Fraktur и Kurrent използват незадължителна добавка от 13 MB. След изтеглянето разпознаването работи офлайн.
+	Historical spelling is preserved. Handwriting, abbreviations and complex layouts need checking.	Историческият правопис се запазва. Ръкописът, съкращенията и сложното оформление трябва да се проверят.
+	Preparing OCR add-on…	Подготовка на добавката за OCR…
+	Historical OCR add-on installed	Добавката за исторически OCR е инсталирана
+	Remove add-on	Премахване на добавката
+	Download historical OCR add-on (13 MB)	Изтегляне на добавката за исторически OCR (13 MB)
+	Historical OCR add-ons require the desktop app.	Добавките за исторически OCR изискват настолното приложение.
+	Wait for text recognition to finish before changing add-ons	Изчакайте разпознаването на текста да приключи, преди да променяте добавките
+	Automatic (historical model)	Автоматично (исторически модел)
+	The historical model detects its supported scripts automatically; Japanese is not included.	Историческият модел автоматично открива поддържаните писмености; японският не е включен.
+	Historical handwriting (Kurrent)	Исторически ръкопис (Kurrent)
+	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	Ръкописът изисква правилно ориентирани хоризонтални редове в една текстова колона. Няколко колони, таблици и бележки в полетата не се поддържат.

@@ -504,6 +504,7 @@ pub struct PdfCraftApp {
     pub a11y_options: a11y_ui::A11yOptions,
     /// Scan & OCR: the Recognize Text choices, the running job, and (tests) run it inline.
     pub ocr_draft: ocr_ui::OcrDraft,
+    pub ocr_addon: ocr_ui::AddonState,
     pub ocr_run: Option<ocr_ui::OcrRun>,
     pub ocr_batch: Option<std::sync::Arc<std::sync::Mutex<ocr_ui::BatchProgress>>>,
     /// Background jobs (OCR, actions, listing pinned folders) run inline instead (tests).
@@ -777,6 +778,7 @@ impl PdfCraftApp {
             sig_expanded: Vec::new(),
             a11y_options: a11y_ui::A11yOptions::default(),
             ocr_draft: ocr_ui::OcrDraft::default(),
+            ocr_addon: ocr_ui::AddonState::default(),
             ocr_run: None,
             ocr_batch: None,
             run_inline: false,

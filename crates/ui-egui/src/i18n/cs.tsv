@@ -202,3 +202,18 @@ key	Space	Mezerník
 	Rotate page {label} counterclockwise	Otočit stránku {label} proti směru hodinových ručiček
 	Rotate page {label} clockwise	Otočit stránku {label} po směru hodinových ručiček
 	Delete page {label}	Odstranit stránku {label}
+	Text style	Styl textu
+	Modern print	Moderní tisk
+	Historical print (Fraktur)	Historický tisk (fraktura)
+	Fraktur and Kurrent use an optional 13 MB add-on. After download, recognition works offline.	Fraktura a kurent používají volitelný doplněk o velikosti 13 MB. Po stažení funguje rozpoznávání offline.
+	Historical spelling is preserved. Handwriting, abbreviations and complex layouts need checking.	Historický pravopis zůstává zachován. Rukopisy, zkratky a složité rozvržení je nutné zkontrolovat.
+	Preparing OCR add-on…	Příprava doplňku OCR…
+	Historical OCR add-on installed	Doplněk historického OCR je nainstalován
+	Remove add-on	Odebrat doplněk
+	Download historical OCR add-on (13 MB)	Stáhnout doplněk historického OCR (13 MB)
+	Historical OCR add-ons require the desktop app.	Doplňky historického OCR vyžadují aplikaci pro počítač.
+	Wait for text recognition to finish before changing add-ons	Před změnou doplňků počkejte na dokončení rozpoznávání textu
+	Automatic (historical model)	Automaticky (historický model)
+	The historical model detects its supported scripts automatically; Japanese is not included.	Historický model automaticky rozpoznává podporovaná písma; japonština není zahrnuta.
+	Historical handwriting (Kurrent)	Historický rukopis (kurent)
+	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	Rukopis vyžaduje správně orientované vodorovné řádky v jednom sloupci. Více sloupců, tabulky a okrajové poznámky nejsou podporovány.

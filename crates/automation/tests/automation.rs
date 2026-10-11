@@ -2973,6 +2973,45 @@ fn ocr_tools_make_a_scan_searchable() {
 }
 
 #[test]
+fn historical_ocr_tools_report_status_and_enforce_the_root() {
+    let dir = workdir("historical-addons");
+    let mut a = auto(&dir);
+    let status = ok(&mut a, "ocr_addon_status", json!({"directory":"historical-v1"}));
+    assert_eq!(status["installed"], false);
+    assert!(!dir.join("historical-v1").exists(), "status must not install or create a directory");
+    for tool in ["ocr_addon_status", "ocr_addon_install", "ocr_addon_remove"] {
+        let result = a.call(tool, &json!({"directory":"../outside/historical-v1"}));
+        assert!(matches!(result, Err(ToolError::Failed(_))), "{tool}: {result:?}");
+    }
+    std::fs::create_dir_all(dir.join("historical-v1")).unwrap();
+    std::fs::write(dir.join("historical-v1/keep.txt"), "unrelated file").unwrap();
+    assert!(a.call("ocr_addon_remove", &json!({"directory":"historical-v1"})).is_err());
+    assert_eq!(std::fs::read_to_string(dir.join("historical-v1/keep.txt")).unwrap(), "unrelated file");
+    for tool in ["ocr_recognize", "ocr_recognize_files"] {
+        let definition = tools().into_iter().find(|entry| entry.name == tool).unwrap();
+        assert_eq!(definition.input_schema["properties"]["recognizer"]["enum"], json!(["modern", "historical", "historical-handwriting"]));
+    }
+    assert!(matches!(a.call("ocr_recognize", &json!({"doc":1,"recognizer":"unknown"})), Err(ToolError::InvalidArgs(_))));
+}
+
+#[test]
+fn historical_ocr_automation_makes_a_scan_searchable() {
+    if !pdfcraft_engine::ocr::available() || pdfcraft_engine::ocr::historical_engine().is_err() {
+        eprintln!("skipped: optional historical OCR add-on is not installed");
+        return;
+    }
+    let dir = workdir("historical-recognition");
+    let mut a = auto(&dir);
+    let doc = ok(&mut a, "doc_create", json!({"from":"text","text":"Historische Schriften bleiben lesbar."}))["doc"].as_u64().unwrap();
+    ok(&mut a, "doc_export_images", json!({"doc":doc,"folder":"scan","dpi":150,"pages":[1]}));
+    let png = std::fs::read_dir(dir.join("scan")).unwrap().next().unwrap().unwrap().path();
+    let scan = ok(&mut a, "doc_create", json!({"from":"images","paths":[png.to_string_lossy()]}))["doc"].as_u64().unwrap();
+    let result = ok(&mut a, "ocr_recognize", json!({"doc":scan,"language":"de","recognizer":"historical","auto_rotate":false,"deskew":false}));
+    assert!(result["pages"][0]["text"].as_str().unwrap().contains("Historische"), "{result}");
+    assert!(result["words"].as_u64().unwrap() >= 4);
+}
+
+#[test]
 fn ocr_enhance_crops_paper_edges_with_margin_and_undo() {
     let dir = workdir("ocr-crop");
     let mut a = auto(&dir);

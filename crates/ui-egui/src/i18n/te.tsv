@@ -2146,3 +2146,18 @@ key	Space	స్పేస్
 	Rotate page {label} counterclockwise	{label} పేజీని అపసవ్య దిశలో తిప్పండి
 	Rotate page {label} clockwise	{label} పేజీని సవ్య దిశలో తిప్పండి
 	Delete page {label}	{label} పేజీని తొలగించండి
+	Text style	వచన శైలి
+	Modern print	ఆధునిక ముద్రిత వచనం
+	Historical print (Fraktur)	చారిత్రక ముద్రిత వచనం (Fraktur)
+	Fraktur and Kurrent use an optional 13 MB add-on. After download, recognition works offline.	Fraktur మరియు Kurrent కోసం ఐచ్ఛికంగా 13 MB యాడ్-ఆన్‌ను ఉపయోగిస్తారు. డౌన్‌లోడ్ చేసిన తర్వాత గుర్తింపు ఆఫ్‌లైన్‌లో పనిచేస్తుంది.
+	Historical spelling is preserved. Handwriting, abbreviations and complex layouts need checking.	చారిత్రక అక్షరక్రమం అలాగే ఉంటుంది. చేతిరాత, సంక్షిప్త పదాలు మరియు సంక్లిష్ట అమరికలను తనిఖీ చేయాలి.
+	Preparing OCR add-on…	OCR యాడ్-ఆన్‌ను సిద్ధం చేస్తోంది…
+	Historical OCR add-on installed	చారిత్రక OCR యాడ్-ఆన్ ఇన్‌స్టాల్ చేయబడింది
+	Remove add-on	యాడ్-ఆన్‌ను తీసివేయి
+	Download historical OCR add-on (13 MB)	చారిత్రక OCR యాడ్-ఆన్‌ను డౌన్‌లోడ్ చేయి (13 MB)
+	Historical OCR add-ons require the desktop app.	చారిత్రక OCR యాడ్-ఆన్‌లకు డెస్క్‌టాప్ యాప్ అవసరం.
+	Wait for text recognition to finish before changing add-ons	యాడ్-ఆన్‌లను మార్చే ముందు వచన గుర్తింపు పూర్తయ్యే వరకు వేచి ఉండండి
+	Automatic (historical model)	స్వయంచాలకం (చారిత్రక మోడల్)
+	The historical model detects its supported scripts automatically; Japanese is not included.	చారిత్రక మోడల్ మద్దతు ఉన్న లిపులను స్వయంచాలకంగా గుర్తిస్తుంది; జపనీస్ చేర్చబడలేదు.
+	Historical handwriting (Kurrent)	చారిత్రక చేతిరాత (Kurrent)
+	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	చేతిరాతకు ఒకే వచన నిలువు వరుసలో సరైన దిశలో ఉన్న అడ్డ పంక్తులు అవసరం. బహుళ నిలువు వరుసలు, పట్టికలు మరియు అంచు గమనికలకు మద్దతు లేదు.

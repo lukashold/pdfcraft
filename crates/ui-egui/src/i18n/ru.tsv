@@ -2129,3 +2129,18 @@ key	Space	Пробел
 	Rotate page {label} counterclockwise	Повернуть страницу {label} против часовой стрелки
 	Rotate page {label} clockwise	Повернуть страницу {label} по часовой стрелке
 	Delete page {label}	Удалить страницу {label}
+	Text style	Стиль текста
+	Modern print	Современный печатный текст
+	Historical print (Fraktur)	Исторический печатный текст (фрактура)
+	Fraktur and Kurrent use an optional 13 MB add-on. After download, recognition works offline.	Для фрактуры и куррента используется необязательное дополнение размером 13 МБ. После загрузки распознавание работает без интернета.
+	Historical spelling is preserved. Handwriting, abbreviations and complex layouts need checking.	Историческое написание сохраняется. Рукописи, сокращения и сложную вёрстку необходимо проверять.
+	Preparing OCR add-on…	Подготовка дополнения OCR…
+	Historical OCR add-on installed	Дополнение для исторического OCR установлено
+	Remove add-on	Удалить дополнение
+	Download historical OCR add-on (13 MB)	Скачать дополнение для исторического OCR (13 МБ)
+	Historical OCR add-ons require the desktop app.	Дополнения для исторического OCR требуют настольного приложения.
+	Wait for text recognition to finish before changing add-ons	Дождитесь завершения распознавания текста, прежде чем изменять дополнения
+	Automatic (historical model)	Автоматически (историческая модель)
+	The historical model detects its supported scripts automatically; Japanese is not included.	Историческая модель автоматически определяет поддерживаемые виды письма; японский не включён.
+	Historical handwriting (Kurrent)	Исторический рукописный текст (куррент)
+	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	Для рукописи нужны правильно ориентированные горизонтальные строки в одной текстовой колонке. Несколько колонок, таблицы и заметки на полях не поддерживаются.

@@ -2211,3 +2211,18 @@ key	Space	Spacja
 	Rotate page {label} counterclockwise	Obróć stronę {label} w lewo
 	Rotate page {label} clockwise	Obróć stronę {label} w prawo
 	Delete page {label}	Usuń stronę {label}
+	Text style	Styl tekstu
+	Modern print	Współczesny druk
+	Historical print (Fraktur)	Druk historyczny (fraktura)
+	Fraktur and Kurrent use an optional 13 MB add-on. After download, recognition works offline.	Fraktura i kurrent korzystają z opcjonalnego dodatku o rozmiarze 13 MB. Po pobraniu rozpoznawanie działa offline.
+	Historical spelling is preserved. Handwriting, abbreviations and complex layouts need checking.	Historyczna pisownia zostaje zachowana. Pismo odręczne, skróty i złożone układy wymagają sprawdzenia.
+	Preparing OCR add-on…	Przygotowywanie dodatku OCR…
+	Historical OCR add-on installed	Dodatek historycznego OCR zainstalowany
+	Remove add-on	Usuń dodatek
+	Download historical OCR add-on (13 MB)	Pobierz dodatek historycznego OCR (13 MB)
+	Historical OCR add-ons require the desktop app.	Dodatki historycznego OCR wymagają aplikacji komputerowej.
+	Wait for text recognition to finish before changing add-ons	Przed zmianą dodatków poczekaj na zakończenie rozpoznawania tekstu
+	Automatic (historical model)	Automatycznie (model historyczny)
+	The historical model detects its supported scripts automatically; Japanese is not included.	Model historyczny automatycznie wykrywa obsługiwane pisma; język japoński nie jest uwzględniony.
+	Historical handwriting (Kurrent)	Historyczne pismo odręczne (kurrent)
+	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	Pismo odręczne wymaga prawidłowo obróconych poziomych wierszy w jednej kolumnie. Wiele kolumn, tabele i notatki na marginesach nie są obsługiwane.

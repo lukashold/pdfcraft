@@ -57,3 +57,12 @@ The additional Latin-language regression checks Dutch `één`, `coöperatie`, `B
 and accented words in Danish, Norwegian, Swedish, Finnish and Portuguese after
 save/reopen. The same model is used without per-language character restrictions.
 Icelandic remains unclaimed because community tests found weak recognition of þ/Þ and Í.
+
+Historical print and handwriting use a separate optional model, downloaded only on
+request. `historical::Historical::load` reads locally installed files;
+`Ocr::recognize_historical` shares the ordinary print detector;
+`Ocr::recognize_handwriting` finds regularly spaced, upright handwriting lines in
+one text column using bounded ink projections. Both return source-image word boxes.
+The model recognizes Fraktur and Kurrent with bounded 96-pixel line
+inference, historical spelling and NFC output. See
+[historical OCR](../../docs/historical-ocr.md) for provenance, test conditions and limits.

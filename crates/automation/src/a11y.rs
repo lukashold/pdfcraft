@@ -147,6 +147,9 @@ impl Automation {
             }
             settings.language = l.into();
         }
+        if let Some(recognizer) = a.opt_str("recognizer")? {
+            settings.recognizer = pdfcraft_engine::ocr::Recognizer::from_id(recognizer).map_err(ToolError::InvalidArgs)?;
+        }
         if let Some(s) = a.opt_bool("skip_text_pages")? {
             settings.skip_text_pages = s;
         }
@@ -232,7 +235,35 @@ impl Automation {
         use pdfcraft_engine::ocr;
         let dirs: Vec<String> = ocr::Models::search_dirs().iter().map(|d| d.to_string_lossy().into_owned()).collect();
         let langs: Vec<Value> = ocr::LANGUAGES.iter().map(|(c, n)| json!({ "code": c, "name": n })).collect();
-        Ok(json!({ "available": ocr::available(), "search_dirs": dirs, "languages": langs }))
+        Ok(
+            json!({ "available": ocr::available(), "search_dirs": dirs, "languages": langs, "recognizers": ["modern", "historical", "historical-handwriting"], "historical_addon": pdfcraft_engine::ocr_addons::status() }),
+        )
+    }
+
+    pub(crate) fn ocr_addon_status(&self, a: &Args) -> Result<Value> {
+        let status = match a.opt_str("directory")? {
+            Some(path) => pdfcraft_engine::ocr_addons::status_at(&self.resolve(path, true)?),
+            None => pdfcraft_engine::ocr_addons::status(),
+        };
+        Ok(json!(status))
+    }
+
+    pub(crate) fn ocr_addon_install(&mut self, a: &Args) -> Result<Value> {
+        let path = match a.opt_str("directory")? {
+            Some(path) => self.resolve(path, true)?,
+            None => self.resolve(&pdfcraft_engine::ocr_addons::default_dir().map_err(failed)?.to_string_lossy(), true)?,
+        };
+        let status = pdfcraft_engine::ocr_addons::install_at(&path).map_err(failed)?;
+        Ok(json!(status))
+    }
+
+    pub(crate) fn ocr_addon_remove(&mut self, a: &Args) -> Result<Value> {
+        let path = match a.opt_str("directory")? {
+            Some(path) => self.resolve(path, true)?,
+            None => self.resolve(&pdfcraft_engine::ocr_addons::default_dir().map_err(failed)?.to_string_lossy(), true)?,
+        };
+        pdfcraft_engine::ocr_addons::remove_at(&path).map_err(failed)?;
+        Ok(json!(pdfcraft_engine::ocr_addons::status_at(&path)))
     }
 }
 

@@ -2236,3 +2236,18 @@ key	Space	مسافة
 	Rotate page {label} counterclockwise	تدوير الصفحة {label} عكس اتجاه عقارب الساعة
 	Rotate page {label} clockwise	تدوير الصفحة {label} باتجاه عقارب الساعة
 	Delete page {label}	حذف الصفحة {label}
+	Text style	نمط النص
+	Modern print	طباعة حديثة
+	Historical print (Fraktur)	طباعة تاريخية (Fraktur)
+	Fraktur and Kurrent use an optional 13 MB add-on. After download, recognition works offline.	يستخدم Fraktur وKurrent إضافة اختيارية بحجم 13 ميغابايت. بعد التنزيل يعمل التعرف دون اتصال بالإنترنت.
+	Historical spelling is preserved. Handwriting, abbreviations and complex layouts need checking.	تُحفظ التهجئة التاريخية. يجب مراجعة الكتابة اليدوية والاختصارات والتخطيطات المعقدة.
+	Preparing OCR add-on…	جارٍ تجهيز إضافة التعرف على النص…
+	Historical OCR add-on installed	تم تثبيت إضافة التعرف على النصوص التاريخية
+	Remove add-on	إزالة الإضافة
+	Download historical OCR add-on (13 MB)	تنزيل إضافة التعرف على النصوص التاريخية (13 ميغابايت)
+	Historical OCR add-ons require the desktop app.	تتطلب إضافات التعرف على النصوص التاريخية تطبيق سطح المكتب.
+	Wait for text recognition to finish before changing add-ons	انتظر اكتمال التعرف على النص قبل تغيير الإضافات
+	Automatic (historical model)	تلقائي (النموذج التاريخي)
+	The historical model detects its supported scripts automatically; Japanese is not included.	يكتشف النموذج التاريخي أنواع الكتابة المدعومة تلقائيًا؛ اليابانية غير مشمولة.
+	Historical handwriting (Kurrent)	كتابة يدوية تاريخية (Kurrent)
+	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	تتطلب الكتابة اليدوية سطورًا أفقية بالاتجاه الصحيح في عمود نص واحد. الأعمدة المتعددة والجداول والملاحظات الهامشية غير مدعومة.

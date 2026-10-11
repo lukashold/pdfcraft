@@ -229,6 +229,139 @@ fn italian_ocr_preserves_all_six_accents_after_save() {
 }
 
 #[test]
+fn historical_addon_recognition_preserves_pixels_unicode_save_and_undo() {
+    if !ocr::available() || ocr::historical_engine().is_err() {
+        eprintln!("skipped: standard OCR models and the optional historical add-on are required");
+        return;
+    }
+    let (mut s, id) = scan("Historische Schriften und schöne Grüße aus Österreich.", 0, 0.0);
+    let original = s.get(id).unwrap().bytes.clone();
+    let before = render(&s, id);
+    let found = s
+        .recognize_text(
+            id,
+            &[],
+            OcrSettings { language: "de".into(), recognizer: ocr::Recognizer::Historical, auto_rotate: false, deskew: false, ..Default::default() },
+        )
+        .unwrap();
+    assert!(found[0].skipped.is_none(), "{found:?}");
+    let saved = s.save_bytes(id).unwrap();
+    let reopened = s.open("historical.pdf", None, saved, None).unwrap();
+    let extracted = text(&s, reopened);
+    for expected in ["Historische", "Schriften", "Grüße", "Österreich"] {
+        assert!(extracted.contains(expected), "missing {expected:?}: {extracted:?}");
+    }
+    assert_eq!(before, render(&s, reopened));
+    s.undo(id).unwrap();
+    assert_eq!(s.get(id).unwrap().bytes, original);
+}
+
+#[test]
+fn ocr_recognizer_is_explicit_and_defaults_to_modern() {
+    assert_eq!(OcrSettings::default().recognizer, ocr::Recognizer::Modern);
+    assert_eq!(ocr::Recognizer::from_id("historical").unwrap().id(), "historical");
+    assert_eq!(ocr::Recognizer::from_id("historical-handwriting").unwrap().id(), "historical-handwriting");
+    assert!(ocr::Recognizer::from_id("unknown").is_err());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn hot_folder_task_json_preserves_historical_recognizers_and_legacy_defaults() {
+    use pdfcraft_engine::hot_folder::Config;
+    for recognizer in ["modern", "historical", "historical-handwriting"] {
+        let json = serde_json::json!({"tasks": [{"id": "scan", "settings": {"language": "de", "recognizer": recognizer}}]});
+        let config: Config = serde_json::from_value(json).unwrap();
+        assert_eq!(config.tasks[0].settings.recognizer.id(), recognizer);
+        let saved = serde_json::to_value(&config).unwrap();
+        assert_eq!(saved["tasks"][0]["settings"]["recognizer"], recognizer);
+        let reopened: Config = serde_json::from_value(saved).unwrap();
+        assert_eq!(reopened.tasks[0].settings, config.tasks[0].settings);
+    }
+    let legacy: Config = serde_json::from_str(r#"{"tasks":[{"id":"scan","settings":{"language":"de"}}]}"#).unwrap();
+    assert_eq!(legacy.tasks[0].settings.recognizer, ocr::Recognizer::Modern);
+    assert!(serde_json::from_value::<Config>(serde_json::json!({"tasks":[{"settings":{"recognizer":"unknown"}}]})).is_err());
+}
+
+/// Public historical scans stay external: see docs/historical-ocr.md for their
+/// pinned sources and licences. These corpora overlap the model's training data,
+/// so this verifies integration and Unicode preservation, not general accuracy.
+#[test]
+fn historical_fraktur_and_kurrent_scans_roundtrip_through_the_engine() {
+    let Some(fixtures) = std::env::var_os("PDFCRAFT_HISTORICAL_FIXTURES") else {
+        eprintln!("skipped: set PDFCRAFT_HISTORICAL_FIXTURES to the documented public line fixtures");
+        return;
+    };
+    assert!(ocr::available(), "historical integration fixtures require the standard detection model");
+    assert!(ocr::historical_engine().is_ok(), "historical integration fixtures require an installed add-on");
+    for (file, expected) in [("drey1834_0031_line02.png", "entſchuldigende"), ("kurrent-00000024_line28.png", "Abends")] {
+        let bytes = std::fs::read(std::path::Path::new(&fixtures).join(file)).unwrap();
+        let mut session = Session::new();
+        let pdf = session.create_from_images(&[(file.into(), bytes)]).unwrap();
+        let id = session.open("historical-scan.pdf", None, pdf, None).unwrap();
+        let original = session.get(id).unwrap().bytes.clone();
+        let pixels = render(&session, id);
+        let pages = session
+            .recognize_text(
+                id,
+                &[],
+                OcrSettings {
+                    recognizer: ocr::Recognizer::Historical,
+                    language: "de".into(),
+                    dpi: 150.0,
+                    auto_rotate: false,
+                    deskew: false,
+                    auto_crop: false,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert!(pages[0].skipped.is_none(), "{file}: {pages:?}");
+        let saved = session.save_bytes(id).unwrap();
+        let reopened = session.open("recognized.pdf", None, saved, None).unwrap();
+        let extracted = text(&session, reopened);
+        assert!(extracted.contains(expected), "{file}: expected {expected:?}, got {extracted:?}; OCR: {pages:?}");
+        assert_eq!(pixels, render(&session, reopened), "{file}: hidden OCR must retain all scan pixels");
+        session.undo(id).unwrap();
+        assert_eq!(session.get(id).unwrap().bytes, original);
+    }
+}
+
+/// This exercises the complete historical manuscript, including line detection.
+/// See docs/historical-ocr.md for the public fixture's provenance and limitations.
+#[test]
+fn historical_handwriting_full_page_is_searchable_after_save_and_undo() {
+    let Some(fixtures) = std::env::var_os("PDFCRAFT_HISTORICAL_FIXTURES") else {
+        eprintln!("skipped: PDFCRAFT_HISTORICAL_FIXTURES points to the public line fixtures");
+        return;
+    };
+    let path = std::path::PathBuf::from(fixtures).parent().unwrap().join("kurrent-00000024.jpg");
+    let mut session = Session::new();
+    let bytes = std::fs::read(path).unwrap();
+    let pdf = session.create_from_images(&[("kurrent.jpg".into(), bytes)]).unwrap();
+    let id = session.open("manuscript.pdf", None, pdf, None).unwrap();
+    let original = session.get(id).unwrap().bytes.clone();
+    let pixels = render(&session, id);
+    let pages = session
+        .recognize_text(
+            id,
+            &[],
+            OcrSettings { recognizer: ocr::Recognizer::HistoricalHandwriting, dpi: 150.0, auto_rotate: false, deskew: false, ..Default::default() },
+        )
+        .unwrap();
+    assert!(pages[0].skipped.is_none(), "{pages:?}");
+    assert!(pages[0].words.len() >= 120, "the whole manuscript must be read, not isolated fragments: {pages:?}");
+    let saved = session.save_bytes(id).unwrap();
+    let reopened = session.open("recognized.pdf", None, saved, None).unwrap();
+    let extracted = text(&session, reopened);
+    for word in ["Gemein", "Friedensthal", "Geschwistern", "Diaspora", "Abends", "Pericope"] {
+        assert!(extracted.contains(word), "missing paragraph {word}: {extracted}");
+    }
+    assert_eq!(pixels, render(&session, reopened));
+    session.undo(id).unwrap();
+    assert_eq!(session.get(id).unwrap().bytes, original);
+}
+
+#[test]
 fn additional_latin_languages_keep_accented_words_after_save() {
     if !ocr::available() {
         eprintln!("skipped: run cargo xtask models");

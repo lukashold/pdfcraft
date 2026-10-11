@@ -1,0 +1,28 @@
+[package]
+name = "pdfcraft-hot-folder"
+description = "Optional PdfCraft Hot Folder application and background worker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+pdfcraft-engine = { workspace = true }
+pdfcraft-fonts = { workspace = true }
+pdfcraft-hot-folder-service = { path = "../../crates/hot-folder-service", version = "0.6.0" }
+eframe = { workspace = true, features = ["default_fonts", "glow", "accesskit", "wayland", "x11"] }
+egui = { workspace = true }
+rfd = { workspace = true }
+serde_json = { workspace = true }
+sys-locale = "0.3"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+tempfile = "3"
+zeroize = "1.8"
+
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1", features = ["process"] }
+
+[dev-dependencies]
+egui_kittest = { workspace = true, features = ["eframe", "wgpu"] }

@@ -35,6 +35,10 @@ fn ocr_language() -> Value {
     json!({ "type": "string", "enum": codes, "description": "Document language (default en)." })
 }
 
+fn ocr_recognizer() -> Value {
+    json!({"type":"string", "enum":["modern","historical","historical-handwriting"], "default":"modern", "description":"historical uses print layout detection (including Fraktur); historical-handwriting reads upright horizontal handwriting (including Kurrent) in ONE text column only, without tables or marginal notes. Both require the optional historical add-on. Recognition never downloads it automatically."})
+}
+
 fn path(what: &str) -> Value {
     json!({ "type": "array", "items": { "type": "integer", "minimum": 1 }, "description": format!("{what}: 1-based positions from the top level, e.g. [2, 1] = the first child of the second bookmark.") })
 }
@@ -928,6 +932,7 @@ pub fn tools() -> Vec<ToolDef> {
                 json!({
                     "doc": doc(),
                     "pages": pages("to recognise (default: all)"),
+                    "recognizer": ocr_recognizer(),
                     "dpi": { "type": "number", "minimum": 72, "maximum": 600, "description": "Resolution pages are read at (default 300; a scanned page is read at most at its own resolution)." },
                     "auto_rotate": { "type": "boolean", "default": true }, "deskew": { "type": "boolean", "default": true }, "auto_crop": { "type": "boolean", "default": false }, "crop_margin": { "type": "number", "minimum": 0, "maximum": 20, "default": 2 }, "recognize": { "type": "boolean", "default": true }, "language": ocr_language(),
                     "skip_text_pages": { "type": "boolean", "description": "Leave pages that already contain text alone (default true)." },
@@ -940,6 +945,7 @@ pub fn tools() -> Vec<ToolDef> {
                 json!({
                     "paths": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
                     "folder": { "type": "string" },
+                    "recognizer": ocr_recognizer(),
                     "dpi": { "type": "number", "minimum": 72, "maximum": 600 },
                     "auto_rotate": { "type": "boolean", "default": true }, "deskew": { "type": "boolean", "default": true }, "auto_crop": { "type": "boolean", "default": false }, "crop_margin": { "type": "number", "minimum": 0, "maximum": 20, "default": 2 }, "recognize": { "type": "boolean", "default": true }, "language": ocr_language(),
                 }),
@@ -952,6 +958,31 @@ pub fn tools() -> Vec<ToolDef> {
             .ro()
             .cmd("ocr.recognize")
             .with(schema(json!({}), &[])),
+        t("ocr_addon_status", "Historical OCR add-on status", "Read local installation and checksum status for the optional historical print/handwriting model. Makes no network request. directory overrides the final historical-v1 folder and obeys --root.")
+            .ro()
+            .with(schema(json!({"directory":{"type":"string"}}), &[])),
+        t("ocr_addon_install", "Download historical OCR add-on", "Explicitly download and checksum-verify the optional Fraktur/Kurrent recognition model. No document is uploaded. Recognition then works offline. directory is the final historical-v1 folder; the default per-user installation path is refused when outside --root.")
+            .with(schema(json!({"directory":{"type":"string"}}), &[])),
+        t("ocr_addon_remove", "Remove historical OCR add-on", "Remove only the owned historical-v1 model files, keeping documents and other files. directory obeys --root. The add-on can be downloaded again later.")
+            .destructive()
+            .with(schema(json!({"directory":{"type":"string"}}), &[])),
+        t("hot_folder_configure", "Configure Hot Folder", "Save the standalone Hot Folder configuration atomically. Does not launch a background worker. Tasks contain id, name, existing disjoint input/output folders, enabled (default false), recursive, pdf, images, start_at (Unix seconds), once, interval_seconds (1..86400), settle_seconds (1..300), originals (keep/move/delete, default keep), archive (for move), and OCR settings. All nested paths honour --root. Set enabled false to stop a task; partial processing is discarded. See docs/hot-folder.md.")
+            .destructive()
+            .with(schema(json!({"config":{"type":"string"}, "settings":{"type":"object", "properties":{"tasks":{"type":"array", "maxItems":32, "items":{"type":"object"}}}, "required":["tasks"], "additionalProperties":false}}), &["config", "settings"])),
+        t("hot_folder_poll", "Process ready Hot Folder inputs", "Run one scheduler pass (one stable input or combined batch per enabled task), saving durable status and receipts. Call again after the configured interval. Existing outputs are never overwritten. Explicit originals move/delete policies act only after all output steps and receipts succeed. Does not start a background worker.")
+            .destructive().with(schema(json!({"config":{"type":"string"}}), &["config"])),
+        t("hot_folder_status", "Hot Folder status", "Read configuration and durable task status, counts, last input/output and actionable errors. No background work is started.")
+            .ro().with(schema(json!({"config":{"type":"string"}}), &["config"])),
+        t("hot_folder_retry", "Retry a Hot Folder task", "Clear failed attempts and reschedule a completed once task. Successful output receipts are preserved to prevent duplicate processing. Stop the task first if a worker is busy.")
+            .with(schema(json!({"config":{"type":"string"}, "task":{"type":"string"}}), &["config", "task"])),
+        t("hot_folder_run_now", "Run Hot Folder at the next poll", "Make an enabled task due at its next poll, overriding its calendar schedule once. Successful receipts remain. The task must already be enabled and its start_at must be due; no worker is started.")
+            .with(schema(json!({"config":{"type":"string"}, "task":{"type":"string"}}), &["config", "task"])),
+        t("hot_folder_service", "Manage Hot Folder system service", "Inspect or explicitly manage the system boot service matching executable and config. Changes require platform administrator rights and are unavailable under --root. Unix install requires a non-root account; Windows installation is performed by the optional MSI component. Nothing is installed implicitly.")
+            .destructive().with(schema(json!({"executable":{"type":"string"},"config":{"type":"string"},"action":{"type":"string","enum":["status","start","stop","enable","disable","install","uninstall"]},"account":{"type":"string"}}), &["executable","config","action"])),
+        t("hot_folder_source", "Connect Hot Folder source", "Manage the configured task's protected credentials or explicit Outlook device sign-in. No passwords or access tokens are returned. save_ftp_password reads a named environment variable; flow is the public object returned by outlook_begin. Stop the task before changing credentials. Credentials require the installer-provisioned service store. Outlook needs your own public-client application registration. No work starts implicitly.")
+            .destructive().with(schema(json!({"config":{"type":"string"},"task":{"type":"string"},"action":{"type":"string","enum":["credential_status","save_ftp_password","forget_credentials","outlook_begin","outlook_poll","outlook_folders"]},"password_env":{"type":"string"},"flow":{"type":"object"},"parent":{"type":"string"}}), &["config","task","action"])),
+        t("hot_folder_project", "Create Hot Folder project", "Create an open PDFCraft manifest containing ordered PDF/image paths. This is not an ABBYY proprietary project. All files must be inside the manifest's parent folder. Existing manifests are never overwritten; all paths honour --root.")
+            .with(schema(json!({"path":{"type":"string"},"files":{"type":"array","minItems":1,"maxItems":10000,"items":{"type":"string"}}}), &["path","files"])),
         t("doc_export_all_images", "Export all images", "Write the images that pages use into a folder (`<name>_Page_<n>_Image_<k>.jpg|png`), each once: JPEG images unchanged, others as PNG with their soft mask as alpha. min_size skips images with fewer pixels on their shorter side. Images that can't be decoded yet (JPEG 2000, JBIG2, CCITT, separations) are listed under skipped. Includes unsaved edits.")
             .cmd("export.all_images")
             .with(schema(

@@ -2102,3 +2102,18 @@ key	Space	空格
 	Rotate page {label} counterclockwise	逆時針旋轉頁面 {label}
 	Rotate page {label} clockwise	順時針旋轉頁面 {label}
 	Delete page {label}	刪除頁面 {label}
+	Text style	文字樣式
+	Modern print	現代印刷體
+	Historical print (Fraktur)	歷史印刷體（Fraktur）
+	Fraktur and Kurrent use an optional 13 MB add-on. After download, recognition works offline.	Fraktur 和 Kurrent 使用可選的 13 MB 附加元件。下載後即可離線辨識。
+	Historical spelling is preserved. Handwriting, abbreviations and complex layouts need checking.	保留歷史拼寫。手寫內容、縮寫和複雜版面需要檢查。
+	Preparing OCR add-on…	正在準備 OCR 附加元件…
+	Historical OCR add-on installed	歷史文字 OCR 附加元件已安裝
+	Remove add-on	移除附加元件
+	Download historical OCR add-on (13 MB)	下載歷史文字 OCR 附加元件（13 MB）
+	Historical OCR add-ons require the desktop app.	歷史文字 OCR 附加元件需要桌面應用程式。
+	Wait for text recognition to finish before changing add-ons	請等待文字辨識完成後再變更附加元件
+	Automatic (historical model)	自動（歷史文字模型）
+	The historical model detects its supported scripts automatically; Japanese is not included.	歷史文字模型會自動偵測其支援的字體；不包含日語。
+	Historical handwriting (Kurrent)	歷史手寫體（Kurrent）
+	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	手寫內容必須為方向正確的水平行，且只有一欄文字。不支援多欄、表格和頁邊註解。

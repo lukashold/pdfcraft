@@ -316,6 +316,15 @@ Fonts are fetched by `cargo xtask demo-pdf` into `target/demo-fonts/`, OCR model
 | `document-orientation.onnx` | PP-LCNet document orientation model | PaddlePaddle / PaddleOCR contributors | Apache-2.0 | https://huggingface.co/PaddlePaddle/PP-LCNet_x1_0_doc_ori_onnx/resolve/7330ab7039123e46af2dc03154b9969aa412c61d/inference.onnx | Offline multilingual OCR and scan orientation correction (cargo xtask models) |
 | `multilingual-dictionary.txt` | PP-OCRv6 recognition dictionary | PaddlePaddle / PaddleOCR contributors | Apache-2.0 | https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/dab3fe35379033fdcb2d0e9572fac0b36c9a9ebf/ppocr/utils/dict/ppocrv6_dict.txt | Offline multilingual OCR and scan orientation correction (cargo xtask models) |
 
+## Optional user-installed add-ons (2)
+
+Downloaded only after an explicit user action and verified by SHA-256. Build commands never fetch these files and standard installers never include them.
+
+| File | Title | Author | Licence | Source | Used for |
+|---|---|---|---|---|---|
+| `historical-recognition.onnx` | Historical print and handwriting recognition: PP-OCRv6 small, ONNX conversion | Benjamin Kiessling (ALMAnaCH, Inria Paris); ONNX conversion by PdfCraft contributors | Apache-2.0 | https://zenodo.org/records/21788405 (original small.safetensors); Kraken 0d07314ba0e6fa31d786bf3f88b20dd93597f591; conversion provenance in docs/historical-ocr-model.txt | Optional historical OCR add-on, installed only by explicit user action; never fetched by the build or bundled in standard installers |
+| `historical-dictionary.json` | Historical PP-OCRv6 small character codec extracted from model metadata | Benjamin Kiessling (ALMAnaCH, Inria Paris); JSON conversion by PdfCraft contributors | Apache-2.0 | https://zenodo.org/records/21788405 (original small.safetensors); conversion provenance in docs/historical-ocr-model.txt | Optional historical OCR add-on character mapping; installed atomically with its matching model after explicit user action |
+
 ## Optional build inputs (1)
 
 Not in this repository and never downloaded by it: compiled in only when the build sets the option (official releases do). Each input attributes its own files.

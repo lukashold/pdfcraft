@@ -25,7 +25,7 @@ update the numbers.
 | 4 | No printing on the web | feature, platform | 15–30 | [hardware-parity.md](hardware-parity.md) |
 | 5 | Chinese UI shows missing-glyph boxes in releases | localization | 6–12 | [localization-parity.md](localization-parity.md) |
 | 6 | Open-issue backlog of wrong results in shipped features | stability | 45–80 | this file |
-| 7 | OCR reads only unaccented Latin | feature | 40–75 | [file-format-parity.md](file-format-parity.md) |
+| 7 | OCR language, handwriting and scan-cleanup gaps | feature | 40–75 | [file-format-parity.md](file-format-parity.md) |
 | 8 | Office export weak, Office import absent | file format | 55–100 | [file-format-parity.md](file-format-parity.md) |
 | 9 | No Preflight; PDF/A partial; PDF/X and PDF/UA absent | standards | 65–115 | [pdf-spec-parity.md](pdf-spec-parity.md) |
 | 10 | Signatures: no PKCS #11, timestamp servers or online revocation | feature, hardware | 40–70 | [pdf-spec-parity.md](pdf-spec-parity.md) |
@@ -140,8 +140,12 @@ update the numbers.
   automatic quarter-turn correction and deskew up to 12 degrees, including correction without OCR.
   Clear paper edges can now define an automatic crop with safety padding; ambiguous white borders
   stay unchanged, and original image pixels remain in the PDF.
+  An explicit optional download adds offline historical print/handwriting recognition, including
+  Fraktur and single-column Kurrent; spelling is preserved and transcription still needs review. See
+  [historical-ocr.md](historical-ocr.md) for model provenance and limited regression evidence.
 - **Missing:** additional language choices, vertical Japanese, editable-text output, deskew on pages
   with annotations, despeckle, background/camera cleanup, MRC compression, browser OCR and scanner input.
+  Complex historical layouts, arbitrary writers and historical Japanese remain unclaimed.
 - **Evidence:** `crates/engine/tests/scan_ocr.rs` and the OCR automation/UI tests; model tests require
   `cargo xtask models`, Japanese fixture generation requires the release `CRAFT_FONTS_DIR` input.
 - **Impact:** scanned documents remain a core Pro workflow with wider language and layout demands.
