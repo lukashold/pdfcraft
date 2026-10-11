@@ -24,6 +24,8 @@
 //!   translators may reorder placeholders freely.
 
 mod catalog;
+#[cfg(test)]
+mod world_tests;
 
 use std::cell::Cell;
 use std::sync::OnceLock;
@@ -67,7 +69,7 @@ fn plural_cs(n: u64) -> usize {
     }
 }
 
-/// Portuguese: 0 and 1 take the singular, everything else the plural.
+/// Portuguese, Hindi and Bengali integer counts: 0 and 1 take the singular, everything else the plural.
 fn plural_pt(n: u64) -> usize {
     usize::from(n > 1)
 }
@@ -126,7 +128,7 @@ fn plural_polish(n: u64) -> usize {
 }
 
 /// The registry. English first: it is the fallback and the source language.
-pub static LANGUAGES: [LangInfo; 17] = [
+pub static LANGUAGES: [LangInfo; 23] = [
     LangInfo { code: "en", name: "English", source: "", plural: plural_one_other, rtl: false, catalog: OnceLock::new() },
     LangInfo { code: "ja", name: "日本語", source: include_str!("ja.tsv"), plural: plural_none, rtl: false, catalog: OnceLock::new() },
     // Simplified Chinese; `zh`, `zh-CN`, `zh-SG` and `zh-Hans-*` locales resolve here (see `candidates`).
@@ -177,6 +179,13 @@ pub static LANGUAGES: [LangInfo; 17] = [
     LangInfo { code: "ar", name: "العربية", source: include_str!("ar.tsv"), plural: plural_arabic, rtl: true, catalog: OnceLock::new() },
     // Polish; every `pl-*` locale (`pl-pl`, `pl_pl.UTF-8`) resolves here.
     LangInfo { code: "pl", name: "Polski", source: include_str!("pl.tsv"), plural: plural_polish, rtl: false, catalog: OnceLock::new() },
+    // Turkish; every `tr-*` locale (`tr-TR`, `tr_TR.UTF-8`) resolves here.
+    LangInfo { code: "tr", name: "Türkçe", source: include_str!("tr.tsv"), plural: plural_none, rtl: false, catalog: OnceLock::new() },
+    LangInfo { code: "id", name: "Bahasa Indonesia", source: include_str!("id.tsv"), plural: plural_none, rtl: false, catalog: OnceLock::new() },
+    LangInfo { code: "ko", name: "한국어", source: include_str!("ko.tsv"), plural: plural_none, rtl: false, catalog: OnceLock::new() },
+    LangInfo { code: "hi", name: "हिन्दी", source: include_str!("hi.tsv"), plural: plural_pt, rtl: false, catalog: OnceLock::new() },
+    LangInfo { code: "bn", name: "বাংলা", source: include_str!("bn.tsv"), plural: plural_pt, rtl: false, catalog: OnceLock::new() },
+    LangInfo { code: "ur", name: "اردو", source: include_str!("ur.tsv"), plural: plural_one_other, rtl: true, catalog: OnceLock::new() },
 ];
 
 impl LangInfo {
@@ -242,6 +251,16 @@ impl Lang {
 
     pub fn name(self) -> &'static str {
         self.0.name
+    }
+
+    /// Which CJK faces the interface puts first in this language: the Simplified or Traditional
+    /// Chinese ones in those languages, the Japanese ones in every other language.
+    pub fn cjk_preference(self) -> pdfcraft_fonts::CjkPreference {
+        match self.0.code {
+            "zh-hans" => pdfcraft_fonts::CjkPreference::Simplified,
+            "zh-hant" => pdfcraft_fonts::CjkPreference::Traditional,
+            _ => pdfcraft_fonts::CjkPreference::Japanese,
+        }
     }
 
     /// Whether the language is written right to left. Its translations come back from the
@@ -758,14 +777,14 @@ mod tests {
             labels.insert(label.to_string());
         }
         assert!(labels.len() > 20 && labels.contains("Comb of characters"), "the scan found the dialog's labels: {labels:?}");
-        for code in ["bg", "de", "es", "fr", "hu", "it", "ja", "pt-br", "ru", "te", "uk", "zh-hans", "zh-hant"] {
+        for code in ["bg", "de", "es", "fr", "hu", "it", "ja", "pt-br", "ru", "te", "tr", "uk", "zh-hans", "zh-hant"] {
             let lang = Lang::from_code(code).expect("registered");
             let missing: Vec<_> = labels.iter().filter(|l| !has(lang, l)).collect();
             assert!(missing.is_empty(), "{code} lacks Shared Field Properties labels: {missing:#?}");
         }
     }
 
-    fn ui_literals() -> std::collections::BTreeSet<String> {
+    pub(super) fn ui_literals() -> std::collections::BTreeSet<String> {
         let mut stack = vec![std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src")];
         let mut literals = std::collections::BTreeSet::new();
         while let Some(dir) = stack.pop() {
@@ -865,6 +884,78 @@ mod tests {
             let mut fonts = Fonts::new(TextOptions::default(), defs);
             for id in [egui::FontId::proportional(13.0), egui::FontId::monospace(13.0), crate::theme::medium(13.0), crate::theme::semibold(17.0)] {
                 assert!(fonts.has_glyphs(&id, &labels), "{build}: {id:?} lacks a Japanese label glyph");
+            }
+        }
+    }
+
+    /// Each Chinese interface language puts its own script's faces first; every other language,
+    /// Japanese and the Chinese-locale fallbacks of `Auto` included, keeps the Japanese order.
+    #[test]
+    fn chinese_languages_prefer_their_own_faces() {
+        use pdfcraft_fonts::CjkPreference;
+        assert_eq!(Lang::from_code("zh-hans").map(Lang::cjk_preference), Some(CjkPreference::Simplified));
+        assert_eq!(Lang::from_code("zh-hant").map(Lang::cjk_preference), Some(CjkPreference::Traditional));
+        assert_eq!(lang_from_tag("zh-TW").map(Lang::cjk_preference), Some(CjkPreference::Traditional));
+        assert_eq!(lang_from_tag("zh_CN.UTF-8").map(Lang::cjk_preference), Some(CjkPreference::Simplified));
+        for code in ["en", "ja", "ar", "te", "fr"] {
+            assert_eq!(Lang::from_code(code).map(Lang::cjk_preference), Some(CjkPreference::Japanese), "{code}");
+        }
+    }
+
+    /// With craft-fonts, every Simplified and Traditional Chinese translation has glyphs, with all
+    /// interface faces (desktop) and with the faces the web build keeps; and every character the
+    /// app's own faces lack comes from the language's Chinese face, so none falls through to a
+    /// Japanese face (Japanese glyph shapes, another baseline) or shows as tofu (#499). A build
+    /// with craft-fonts but no allowed Chinese face fails here instead of skipping.
+    #[test]
+    fn chinese_labels_have_glyphs() {
+        use egui::epaint::text::{Fonts, TextOptions};
+        use skrifa::MetadataProvider as _;
+        if pdfcraft_fonts::CRAFT_FONTS.is_empty() {
+            eprintln!("skipping Chinese glyph checks: build with CRAFT_FONTS_DIR to run them");
+            return;
+        }
+        for code in ["zh-hans", "zh-hant"] {
+            let lang = Lang::from_code(code).expect("registered");
+            let cjk = lang.cjk_preference();
+            let faces =
+                if code == "zh-hans" { pdfcraft_fonts::ui_simplified_chinese_fonts() } else { pdfcraft_fonts::ui_traditional_chinese_fonts() };
+            let Some(chinese) = faces.first() else { panic!("{code}: craft-fonts has no allowed {} face", cjk.script()) };
+            let (entries, errors) = parse_entries(lang.0.source, lang.0.plural_forms());
+            assert!(errors.is_empty(), "{code}: {errors:?}");
+            let labels: Vec<char> =
+                entries.iter().flat_map(|e| e.translation.chars()).chain(lang.name().chars()).filter(|c| !c.is_control()).collect();
+
+            let desktop = crate::theme::font_definitions_for(cjk);
+            let own: Vec<skrifa::FontRef> = ["Inter", "Inter-Medium", "Inter-SemiBold", "JetBrainsMono"]
+                .iter()
+                .map(|name| {
+                    let data = &desktop.font_data[*name];
+                    skrifa::FontRef::from_index(&data.font, data.index).expect("bundled font parses")
+                })
+                .collect();
+            let face = skrifa::FontRef::new(chinese.bytes).expect("craft-fonts face parses");
+            let mut not_chinese: Vec<char> = labels
+                .iter()
+                .copied()
+                .filter(|c| !c.is_whitespace() && own.iter().all(|f| f.charmap().map(*c).is_none()) && face.charmap().map(*c).is_none())
+                .collect();
+            not_chinese.sort_unstable();
+            not_chinese.dedup();
+            assert!(not_chinese.is_empty(), "{code}: {} lacks {not_chinese:?}", chinese.name());
+
+            let mut web = crate::theme::font_definitions_for(cjk);
+            for family in web.families.values_mut() {
+                family.retain(|name| pdfcraft_fonts::CRAFT_FONTS.iter().find(|f| f.name() == *name).is_none_or(|f| f.on_web()));
+            }
+            for (build, defs) in [("desktop", desktop), ("web", web)] {
+                let mut fonts = Fonts::new(TextOptions::default(), defs);
+                for id in [egui::FontId::proportional(13.0), egui::FontId::monospace(13.0), crate::theme::medium(13.0), crate::theme::semibold(17.0)]
+                {
+                    let missing: std::collections::BTreeSet<char> =
+                        labels.iter().copied().filter(|c| !fonts.has_glyphs(&id, &c.to_string())).collect();
+                    assert!(missing.is_empty(), "{code} {build}: {id:?} lacks label glyphs {missing:?}");
+                }
             }
         }
     }
@@ -1174,6 +1265,97 @@ mod tests {
         let mut restored = crate::PdfCraftApp::default();
         restored.restore(&app.persist());
         assert_eq!(restored.language, "cs");
+    }
+
+    /// Turkish covers every registered menu title and menu command label, keeps ellipses, and
+    /// persists in preferences.
+    #[test]
+    fn turkish_covers_every_menu_label() {
+        let tr_lang = Lang::from_code("tr").expect("tr registered");
+        assert_eq!(tr_lang.name(), "Türkçe");
+        assert_eq!(tr(tr_lang, "File"), "Dosya");
+        assert_eq!(tr(tr_lang, "Türkçe Belge.pdf"), "Türkçe Belge.pdf");
+        assert_eq!((0..=6).map(|n| (tr_lang.0.plural)(n)).collect::<Vec<_>>(), [0; 7]);
+        for spec in pdfcraft_engine::commands::COMMANDS {
+            let Some(menu) = spec.menu else { continue };
+            assert!(has(tr_lang, menu), "Turkish lacks the menu title {menu:?}");
+            assert!(has(tr_lang, spec.label), "Turkish lacks the {menu} menu label {:?} ({})", spec.label, spec.id);
+        }
+        const KEEP_AS_IS: &[&str] = &[
+            "OK",
+            "PDF/A…",
+            "Microsoft Word (.docx)",
+            "PostScript / EPS",
+            "Preflight",
+            "JavaScript",
+            "ZIP",
+            "{n} {kind}",
+            "{rule} - {status}",
+            "Poster",
+            "{field}: {e}",
+            "`{command}` {when}",
+            "{0}: {1}",
+            "{month} {y}",
+            "+LOC",
+            "−LOC",
+            "ΔLOC",
+            "+Bin",
+            "−Bin",
+            "Model",
+            "Home / End",
+        ];
+        let (entries, errors) = parse_entries(tr_lang.0.source, tr_lang.0.plural_forms());
+        assert!(errors.is_empty(), "Turkish catalog errors: {errors:?}");
+        for e in &entries {
+            assert!(
+                e.source != e.translation
+                    || KEEP_AS_IS.contains(&e.source.as_str())
+                    || (e.context == "key" && KEY_CAP_NAMES.contains(&e.source.as_str())),
+                "{:?} is untranslated",
+                e.source
+            );
+            assert!(!e.translation.contains("..."), "use … rather than three dots: {:?}", e.translation);
+            assert_eq!(e.source.starts_with(' '), e.translation.starts_with(' '), "leading space mismatch: {:?}", e.translation);
+            assert_eq!(e.source.ends_with(' '), e.translation.ends_with(' '), "trailing space mismatch: {:?}", e.translation);
+        }
+        let mut app = crate::PdfCraftApp::default();
+        app.set_option("language", "tr").unwrap();
+        assert!(app.set_option("language", "tu").is_err());
+        assert_eq!(app.language, "tr");
+        let mut restored = crate::PdfCraftApp::default();
+        restored.restore(&app.persist());
+        assert_eq!(restored.language, "tr");
+    }
+
+    /// Turkish translates every registered command, menu and All tools label.
+    #[test]
+    fn turkish_covers_commands_and_catalogue() {
+        let tr_lang = Lang::from_code("tr").expect("tr registered");
+        for command in pdfcraft_engine::commands::COMMANDS {
+            assert!(has(tr_lang, command.label), "missing command: {}", command.label);
+            if let Some(menu) = command.menu {
+                assert!(has(tr_lang, menu), "missing menu: {menu}");
+            }
+        }
+        for group in pdfcraft_engine::catalog::TOOL_GROUPS {
+            assert!(has(tr_lang, group.label), "missing group: {}", group.label);
+            for section in group.sections {
+                assert!(has(tr_lang, section.title), "missing section: {}", section.title);
+                for item in section.items {
+                    assert!(has(tr_lang, item.label), "missing item: {}", item.label);
+                }
+            }
+        }
+    }
+
+    /// Turkish translates every `tl!("…")` literal in the UI source.
+    #[test]
+    fn turkish_covers_ui_literals() {
+        let literals = ui_literals();
+        assert!(literals.len() > 900, "source scan found only {} literals", literals.len());
+        let tr_lang = Lang::from_code("tr").expect("tr registered");
+        let missing: Vec<_> = literals.iter().filter(|label| !has(tr_lang, label)).collect();
+        assert!(missing.is_empty(), "untranslated Turkish UI literals: {missing:#?}");
     }
 
     #[test]
@@ -2112,7 +2294,7 @@ mod tests {
         let ar = arabic();
         assert_eq!(ar.name(), "العربية");
         assert!(ar.rtl());
-        assert!(Lang::all().filter(|l| l.rtl()).eq([ar]), "Arabic is the only right-to-left language");
+        assert!(Lang::all().filter(|l| l.rtl()).eq([ar, Lang::from_code("ur").unwrap()]), "Arabic and Urdu use right-to-left display");
         assert_eq!(normalize_pref("AR"), Some("ar"));
         for tag in ["ar", "ar-MA", "ar_EG.UTF-8", "AR-sa", "ar_DZ@variant"] {
             assert_eq!(lang_from_tag(tag), Some(ar), "{tag}");

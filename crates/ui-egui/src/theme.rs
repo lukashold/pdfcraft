@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use egui::{Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Stroke, Visuals};
+pub use pdfcraft_fonts::CjkPreference;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum ThemeKind {
@@ -134,11 +135,12 @@ pub fn install_fonts(ctx: &egui::Context) {
     ctx.set_fonts(font_definitions());
 }
 
-/// Install the interface fonts with the CJK fallback order for the UI language (Chinese
-/// first for Simplified Chinese, Japanese first otherwise). Call it when the language
-/// changes; the new faces take effect next frame.
-pub fn install_fonts_for(ctx: &egui::Context, prefer_hans: bool) {
-    ctx.set_fonts(installed_font_definitions(prefer_hans));
+/// Install the interface fonts with the CJK fallback order for the UI language (the Simplified or
+/// Traditional Chinese faces first in those languages, Japanese first otherwise; see
+/// [`crate::i18n::Lang::cjk_preference`]). Call it when the language changes; the new faces take
+/// effect next frame.
+pub fn install_fonts_for(ctx: &egui::Context, cjk: CjkPreference) {
+    ctx.set_fonts(installed_font_definitions(cjk));
 }
 
 /// The name of the installed face [`installed_font_definitions`] may add after the embedded ones.
@@ -146,13 +148,20 @@ pub const SYSTEM_FALLBACK: &str = "system-fallback";
 
 /// What [`install_fonts_for`] installs: [`font_definitions_for`], then, on desktop, one face
 /// already installed on this machine as the last fallback of every family. It only draws
-/// characters no embedded face has (an Arabic file name in a build without craft-fonts);
-/// `PDFCRAFT_SYSTEM_FONTS=0` leaves it out.
-pub fn installed_font_definitions(prefer_hans: bool) -> FontDefinitions {
+/// characters no embedded face has: an Arabic file name in a build without craft-fonts, or, in a
+/// Chinese interface the build has no Chinese face for, the interface itself (an installed
+/// PingFang, Microsoft YaHei or WenQuanYi, #882). `PDFCRAFT_SYSTEM_FONTS=0` leaves it out.
+pub fn installed_font_definitions(cjk: CjkPreference) -> FontDefinitions {
     #[cfg_attr(target_arch = "wasm32", expect(unused_mut))]
-    let mut fonts = font_definitions_for(prefer_hans);
+    let mut fonts = font_definitions_for(cjk);
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(data) = crate::system_fonts::fallback() {
+    let need = crate::system_fonts::need_for(
+        cjk,
+        !pdfcraft_fonts::ui_simplified_chinese_fonts().is_empty(),
+        !pdfcraft_fonts::ui_traditional_chinese_fonts().is_empty(),
+    );
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(data) = crate::system_fonts::fallback(need) {
         fonts.font_data.insert(SYSTEM_FALLBACK.to_owned(), data);
         for stack in fonts.families.values_mut() {
             stack.push(SYSTEM_FALLBACK.to_owned());
@@ -162,17 +171,17 @@ pub fn installed_font_definitions(prefer_hans: bool) -> FontDefinitions {
 }
 
 /// The interface fonts: Inter (and JetBrains Mono for code) first, then egui's defaults, then
-/// the CJK, Arabic and Telugu faces of the optional craft-fonts build input as the last fallback
-/// in every family. Without craft-fonts there is no Japanese, Chinese, Arabic or Telugu face here.
+/// the CJK, Arabic/Urdu, Indic and Korean faces of the optional craft-fonts input as the last
+/// fallback in every family. Without craft-fonts these scripts have no bundled UI face here.
 pub fn font_definitions() -> FontDefinitions {
-    font_definitions_for(false)
+    font_definitions_for(CjkPreference::Japanese)
 }
 
-/// [`font_definitions`] with the CJK fallback order for the UI language. Simplified Chinese
-/// must come first in Chinese mode: otherwise shared characters render in the Japanese face
-/// while Simplified-only characters (e.g. U+6B22 欢) fall through to the Chinese face, and
-/// the mixed vertical metrics sink them below the line.
-pub fn font_definitions_for(prefer_hans: bool) -> FontDefinitions {
+/// [`font_definitions`] with the CJK fallback order for the UI language. The Chinese faces must
+/// come first in Chinese: otherwise shared characters render in the Japanese face (Japanese
+/// glyph shapes) while Simplified-only characters (e.g. U+6B22 欢) fall through to the Chinese
+/// face, and the mixed vertical metrics sink them below the line.
+pub fn font_definitions_for(cjk: CjkPreference) -> FontDefinitions {
     let mut fonts = FontDefinitions::default();
     let add = |fonts: &mut FontDefinitions, name: &str, bytes: &'static [u8]| {
         fonts.font_data.insert(name.to_owned(), Arc::new(FontData::from_static(bytes)));
@@ -184,7 +193,7 @@ pub fn font_definitions_for(prefer_hans: bool) -> FontDefinitions {
     fonts.families.entry(FontFamily::Proportional).or_default().insert(0, "Inter".to_owned());
     fonts.families.entry(FontFamily::Monospace).or_default().insert(0, "JetBrainsMono".to_owned());
     // The same static bytes pdfcraft-fonts uses for Japanese/Chinese text in PDFs: one copy, not two.
-    for face in pdfcraft_fonts::ui_cjk_fonts(prefer_hans) {
+    for face in pdfcraft_fonts::ui_cjk_fonts(cjk) {
         let name = face.name();
         // Japanese and Chinese faces have distinct family names, so no collision here.
         if !fonts.font_data.contains_key(&name) {
@@ -194,9 +203,9 @@ pub fn font_definitions_for(prefer_hans: bool) -> FontDefinitions {
             fonts.families.entry(family).or_default().push(name.clone());
         }
     }
-    // Arabic-script faces (file names, document titles) and Telugu faces (the Telugu interface,
-    // file names) after the CJK ones; the ranges don't overlap.
-    for face in pdfcraft_fonts::ui_arabic_fonts().into_iter().chain(pdfcraft_fonts::ui_telugu_fonts()) {
+    // Arabic/Urdu, Indic and Korean scripts share the same embedded fallbacks on desktop,
+    // web and mobile. None rely on fonts installed on the user's device.
+    for face in pdfcraft_fonts::ui_script_fonts() {
         let name = face.name();
         if !fonts.font_data.contains_key(&name) {
             add(&mut fonts, &name, face.bytes);

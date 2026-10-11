@@ -7,6 +7,10 @@ use anyhow::{Context, Result, bail, ensure};
 #[path = "mobile_android_notices.rs"]
 mod android_notices;
 
+// Use the build's exact face-selection policy when collecting font notices.
+#[path = "../../crates/fonts/src/select.rs"]
+mod font_selection;
+
 fn run_in(dir: &Path, tool: &str, args: &[&str]) -> Result<()> {
     let status = Command::new(tool).args(args).current_dir(dir).status().with_context(|| format!("run {tool}"))?;
     ensure!(status.success(), "{tool} {} failed: {status}", args.join(" "));
@@ -109,7 +113,8 @@ fn frontend_notices(root: &Path) -> Result<()> {
         for line in manifest.lines().map(str::trim).filter(|line| !line.is_empty() && !line.starts_with('#')) {
             let fields = line.split(" | ").map(str::trim).collect::<Vec<_>>();
             let [family, style, _, scripts, _, licence, ..] = fields.as_slice() else { bail!("Invalid craft-fonts manifest line") };
-            let web = (*family == "BIZ UDPGothic" && *style == "Regular") || scripts.split(',').any(|s| matches!(s.trim(), "Arab" | "Telu"));
+            let scripts = scripts.split(',').map(str::trim).collect::<Vec<_>>();
+            let web = !font_selection::barred(family) && font_selection::on_web(family, style, &scripts);
             if web && seen.insert(*licence) {
                 ensure!(Path::new(licence).components().all(|c| matches!(c, std::path::Component::Normal(_))), "Invalid font licence path");
                 append_notice(&mut text, family, &fonts.join(licence))?;

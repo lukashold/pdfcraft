@@ -32,7 +32,7 @@ update the numbers.
 | 11 | Accessibility: checker only, no tagging tools | feature | 40–70 | [target-app-parity.md](target-app-parity.md) |
 | 12 | No measured fidelity harness against Acrobat | quality | (in 2) | [target-app-parity.md](target-app-parity.md) |
 | 13 | Performance budgets and lazy loading of very large files | performance | 25–45 | this file |
-| 14 | Arabic not mirrored; no Hindi, Indonesian, Korean, Vietnamese | localization | 30–50 | [localization-parity.md](localization-parity.md) |
+| 14 | Arabic/Urdu not mirrored; no Vietnamese | localization | 30–50 | [localization-parity.md](localization-parity.md) |
 | 15 | Forms: JavaScript object model, actions, submit, XFA depth | feature | 40–75 | [pdf-spec-parity.md](pdf-spec-parity.md) |
 | 16 | UI precision gaps (multi-select move, rulers, accelerators, windows) | UI/UX | 30–60 | [ui-parity.md](ui-parity.md) |
 | 17 | Certificate security and other protect gaps | feature, spec | 15–30 | [pdf-spec-parity.md](pdf-spec-parity.md) |
@@ -108,6 +108,9 @@ update the numbers.
 - **Estimate:** 15–30 h. **Doc:** [hardware-parity.md](hardware-parity.md).
 
 ### 5. Chinese UI shows missing-glyph boxes in releases
+
+The combined preview includes existing #879 and craft-fonts #17 at fixed revisions;
+this upstream release gap remains listed until that contribution is merged and released.
 
 - **Missing:** a Simplified Chinese (`Hans`) UI face in release builds and a working fallback.
 - **Evidence:** [#826](https://github.com/storytold/pdfcraft/issues/826),
@@ -213,14 +216,12 @@ update the numbers.
   (#730).
 - **Estimate:** 25–45 h. **Doc:** this file.
 
-### 14. Arabic not mirrored; no Hindi, Indonesian, Korean, Vietnamese
+### 14. Arabic/Urdu not mirrored; no Vietnamese
 
 - **Missing:** a right-to-left layout (panels, menus, alignment), bidirectional text in the text
-  layout itself (wrapping, typed text); catalogs for Hindi, Indonesian, Korean and Vietnamese
-  (Acrobat ships Korean; it ships Arabic in its Middle East edition; it ships none of the other
-  three).
+  layout itself (wrapping, typed text); a Vietnamese catalog and native-speaker review of the new Hindi, Bengali, Indonesian, Urdu and Korean catalogs.
 - **Evidence:** [localization.md](localization.md) §Arabic; `misc.rtl-ui` planned.
-- **Estimate:** 30–50 h (Arabic RTL 20–35, four catalogs 10–15 plus review). **Doc:**
+- **Estimate:** not re-estimated (remaining work is RTL layout/input, Vietnamese and native review). **Doc:**
   [localization-parity.md](localization-parity.md).
 
 ### 15. Forms: JavaScript object model, actions, submit, XFA depth

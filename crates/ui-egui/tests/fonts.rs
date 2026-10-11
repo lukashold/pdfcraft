@@ -2,10 +2,13 @@
 
 use egui::epaint::text::{Fonts, TextOptions};
 use egui::{Color32, FontFamily, FontId};
-use pdfcraft_ui_egui::theme;
+use pdfcraft_ui_egui::theme::{self, CjkPreference};
 
 const JAPANESE: &str = "日本語の文字";
-const CHINESE: &str = "简体中文欢迎";
+/// Simplified-only forms (简 欢 导 签), shared ideographs and full-width punctuation.
+const SIMPLIFIED: &str = "简体中文，欢迎导出签名。";
+/// Traditional forms (體 歡 匯 簽) and the Traditional-only 查 the Japanese faces lack.
+const TRADITIONAL: &str = "繁體中文，歡迎匯出簽名、查找。";
 const ARABIC: &str = "واحد اثنين";
 const TELUGU: &str = "తెలుగు ఫైల్";
 
@@ -45,32 +48,54 @@ fn japanese_ui_text_uses_craft_fonts() {
     }
 }
 
-/// Chinese mode orders the CJK fallback with the `Hans` group first, so one line never
-/// mixes faces with different vertical metrics. Without an allowed `Hans` face in the
-/// build input the order part still holds; glyph coverage follows the craft-fonts checkout.
+/// In Simplified and Traditional Chinese the CJK fallback starts with that script's faces, so a
+/// line takes Chinese glyph shapes and never mixes faces with different vertical metrics; in every
+/// other language the Japanese faces still lead. A build with craft-fonts but no allowed Chinese
+/// face fails here rather than skipping (that is how the tofu of #499 shipped with CI green).
 #[test]
 fn chinese_ui_text_prefers_the_chinese_face() {
-    if pdfcraft_fonts::ui_chinese_fonts().is_empty() {
-        eprintln!(
-            "skipping chinese_ui_text_prefers_the_chinese_face: no Hans face bundled (set CRAFT_FONTS_DIR with an allowed Chinese face to run it)"
-        );
+    if pdfcraft_fonts::CRAFT_FONTS.is_empty() {
+        eprintln!("skipping chinese_ui_text_prefers_the_chinese_face: built without craft-fonts (set CRAFT_FONTS_DIR to run it)");
         return;
     }
-    let defs = theme::font_definitions_for(true);
-    let hans: Vec<String> = pdfcraft_fonts::ui_chinese_fonts().iter().map(|f| f.name()).collect();
+    let cases = [
+        (CjkPreference::Simplified, pdfcraft_fonts::ui_simplified_chinese_fonts(), SIMPLIFIED),
+        (CjkPreference::Traditional, pdfcraft_fonts::ui_traditional_chinese_fonts(), TRADITIONAL),
+    ];
+    for (cjk, faces, text) in cases {
+        let zh: Vec<String> = faces.iter().map(|f| f.name()).collect();
+        assert!(!zh.is_empty(), "craft-fonts has no allowed {} face: {cjk:?} interface text would be tofu", cjk.script());
+        let defs = theme::font_definitions_for(cjk);
+        for family in [FontFamily::Proportional, FontFamily::Monospace] {
+            let stack = &defs.families[&family];
+            let first_zh = stack.iter().position(|n| zh.contains(n)).expect("a Chinese face is a fallback");
+            let first_ja = stack.iter().position(|n| n.starts_with("BIZ UDPGothic")).expect("BIZ UDPGothic is a fallback");
+            let own = stack.iter().position(|n| n == "Inter" || n == "JetBrainsMono").expect("the app's own font");
+            assert!(own < first_zh && first_zh < first_ja, "{cjk:?} {family:?}: {stack:?}");
+        }
+        let mut fonts = Fonts::new(TextOptions::default(), defs);
+        for id in families() {
+            assert!(fonts.has_glyphs(&id, text), "{cjk:?}: {id:?} lacks a glyph of {text}");
+        }
+        // Real glyphs are about a full em wide each, full-width punctuation included; tofu boxes
+        // and missing glyphs are not.
+        for w in layout_widths(&mut fonts, text) {
+            assert!(w > 13.0 * 0.8 * text.chars().count() as f32, "{cjk:?}: {w}");
+        }
+    }
+    // Japanese (and every other language) keeps the Japanese faces first: Chinese faces only draw
+    // what they lack, such as a Simplified Chinese file name.
+    let defs = theme::font_definitions();
+    let zh: Vec<String> = pdfcraft_fonts::ui_simplified_chinese_fonts().iter().map(|f| f.name()).collect();
     for family in [FontFamily::Proportional, FontFamily::Monospace] {
         let stack = &defs.families[&family];
-        let first_zh = stack.iter().position(|n| hans.iter().any(|h| h == n)).expect("a Hans face is a fallback");
+        let first_zh = stack.iter().position(|n| zh.contains(n)).expect("a Chinese face is a fallback");
         let first_ja = stack.iter().position(|n| n.starts_with("BIZ UDPGothic")).expect("BIZ UDPGothic is a fallback");
-        let own = stack.iter().position(|n| n == "Inter" || n == "JetBrainsMono").expect("the app's own font");
-        assert!(own < first_zh && first_zh < first_ja, "{family:?}: {stack:?}");
+        assert!(first_ja < first_zh, "{family:?}: {stack:?}");
     }
-    let mut fonts = Fonts::new(TextOptions::default(), defs);
+    let mut fonts = Fonts::new(TextOptions::default(), theme::font_definitions());
     for id in families() {
-        assert!(fonts.has_glyphs(&id, CHINESE), "{id:?} lacks {CHINESE}");
-    }
-    for w in layout_widths(&mut fonts, CHINESE) {
-        assert!(w > 13.0 * 0.8 * CHINESE.chars().count() as f32, "{w}");
+        assert!(fonts.has_glyphs(&id, SIMPLIFIED), "Japanese order: {id:?} lacks a glyph of {SIMPLIFIED}");
     }
 }
 
@@ -124,12 +149,39 @@ fn telugu_ui_text_uses_craft_fonts() {
     }
 }
 
+/// Conjunct formation and Urdu joining must work through the actual egui shaper,
+/// independently of whether a font merely contains each Unicode character.
+#[test]
+fn indic_conjuncts_and_urdu_joining_use_embedded_shaping() {
+    for (script, joined, separated) in
+        [("Deva", "क्ष", "क्\u{200c}ष"), ("Beng", "ক্ষ", "ক্\u{200c}ষ"), ("Arab", "پاکستان", "پ\u{200c}ا\u{200c}ک\u{200c}س\u{200c}ت\u{200c}ا\u{200c}ن")]
+    {
+        if !pdfcraft_fonts::CRAFT_FONTS.iter().any(|font| font.covers(script)) {
+            assert!(pdfcraft_fonts::CRAFT_FONTS.is_empty(), "the documented craft-fonts input must contain {script}");
+            eprintln!("skipping {script} shaping: build without craft-fonts");
+            continue;
+        }
+        let defs = theme::font_definitions();
+        assert!(!defs.font_data.contains_key(theme::SYSTEM_FALLBACK));
+        let mut fonts = Fonts::new(TextOptions::default(), defs);
+        for id in families() {
+            assert!(fonts.has_glyphs(&id, joined), "{script}, {id:?}: missing glyph");
+        }
+        let joined_widths = layout_widths(&mut fonts, joined);
+        let separated_widths = layout_widths(&mut fonts, separated);
+        for (joined_width, separated_width) in joined_widths.iter().zip(&separated_widths) {
+            assert!(joined_width.is_finite() && *joined_width > 0.0);
+            assert!(joined_width < separated_width, "{script}: contextual shaping must join {joined:?}: {joined_width} vs {separated_width}");
+        }
+    }
+}
+
 /// On a machine with a suitable installed font, the installed definitions end every family
 /// with it and Arabic text has glyphs; the embedded-only definitions never name it.
 #[test]
 fn system_fallback_fills_missing_scripts() {
     assert!(!theme::font_definitions().font_data.contains_key(theme::SYSTEM_FALLBACK));
-    let defs = theme::installed_font_definitions(false);
+    let defs = theme::installed_font_definitions(CjkPreference::Japanese);
     if !defs.font_data.contains_key(theme::SYSTEM_FALLBACK) {
         eprintln!("skipping system_fallback_fills_missing_scripts: no installed fallback font (or PDFCRAFT_SYSTEM_FONTS=0)");
         assert!(defs.families.values().all(|stack| !stack.iter().any(|n| n == theme::SYSTEM_FALLBACK)));
@@ -145,6 +197,28 @@ fn system_fallback_fills_missing_scripts() {
         assert!(fonts.has_glyphs(&id, "PdfCraft"), "{id:?}");
     }
     assert!(layout_widths(&mut fonts, ARABIC).iter().all(|w| w.is_finite() && *w > 0.0));
+}
+
+/// #882: a Chinese interface in a build without an embedded Chinese face (no craft-fonts, a
+/// source build) takes an installed Chinese face as its last fallback when the machine has one,
+/// so Simplified-only characters aren't boxes; with the embedded face it isn't needed.
+#[test]
+fn a_chinese_interface_without_an_embedded_face_uses_an_installed_one() {
+    for (cjk, text, embedded) in [
+        (CjkPreference::Simplified, SIMPLIFIED, !pdfcraft_fonts::ui_simplified_chinese_fonts().is_empty()),
+        (CjkPreference::Traditional, TRADITIONAL, !pdfcraft_fonts::ui_traditional_chinese_fonts().is_empty()),
+    ] {
+        let defs = theme::installed_font_definitions(cjk);
+        let installed = defs.font_data.contains_key(theme::SYSTEM_FALLBACK);
+        let mut fonts = Fonts::new(TextOptions::default(), defs);
+        if !embedded && !installed {
+            eprintln!("skipping the {cjk:?} system-face check: no embedded or installed Chinese face (or PDFCRAFT_SYSTEM_FONTS=0)");
+            continue;
+        }
+        for id in families() {
+            assert!(fonts.has_glyphs(&id, text), "{cjk:?}: {id:?} lacks a glyph of {text} (embedded {embedded}, installed {installed})");
+        }
+    }
 }
 
 /// Without craft-fonts the interface fonts still install and lay out any text (Japanese falls
@@ -180,6 +254,8 @@ fn primary_ui_fonts_cover_latin_and_cyrillic_catalogs() {
         ("hu", include_str!("../src/i18n/hu.tsv")),
         ("uk", include_str!("../src/i18n/uk.tsv")),
         ("it", include_str!("../src/i18n/it.tsv")),
+        ("tr", include_str!("../src/i18n/tr.tsv")),
+        ("id", include_str!("../src/i18n/id.tsv")),
     ] {
         let mut text = String::from("áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽãõçâêôàÃÕÇÂÊÔÀñÑüÜäÄöÖőűß„“¿¡«»…ґҐєЄіІїЇ");
         for line in catalog.lines().filter(|l| !l.starts_with('#')) {

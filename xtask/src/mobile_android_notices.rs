@@ -115,7 +115,7 @@ fn bundle(manifest: Manifest) -> Result<(String, BTreeMap<String, Vec<u8>>)> {
         ensure!(!artifact.coordinate.is_empty() && artifact.coordinate.len() <= 512, "Invalid Android artifact identity");
         if artifact.coordinate.starts_with("com.google.android.material:material:") {
             ensure!(
-                artifact.coordinate == "com.google.android.material:material:1.12.0",
+                artifact.coordinate == "com.google.android.material:material:1.13.0",
                 "Update the verified Material notice for the selected version"
             );
         }

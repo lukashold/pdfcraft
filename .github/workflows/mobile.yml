@@ -3,7 +3,7 @@ name: Mobile packages
 on:
   workflow_dispatch:
   push:
-    branches: [codex/mobile-apps, codex/mobile-touch-preview]
+    branches: [codex/mobile-apps, codex/mobile-touch-preview, codex/world-language-preview]
   pull_request:
     paths:
       - packaging/mobile/**
@@ -53,8 +53,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          repository: storytold/craft-fonts
-          ref: 8dcdacd5153e64560d109541a47d806f26f048c0
+          repository: lukashold/craft-fonts
+          ref: 9e89a056b92666d14ba70cd1c0811d9cfb6777fe
           path: craft-fonts
       - uses: dtolnay/rust-toolchain@1.95.0
         with:
