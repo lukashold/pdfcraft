@@ -44,7 +44,7 @@ jobs:
           python export_historical.py small.safetensors release
           cd release
           printf '%s\n' \
-            'e8de47f398bd4f7943799c6bf84cc1a4093dd24ace8d23ff0a88ddc44011f57e  historical-recognition.onnx' \
+            '10904178b6ecf2dffe26d8e3f5873cd396929829e6e87e3c983d88ae2060349a  historical-recognition.onnx' \
             'dc2070c479e38ccdce553fbfc96af26e6824333dcc969b8855875acd54f85fde  historical-dictionary.json' > SHA256SUMS.txt
           sha256sum --check SHA256SUMS.txt
           cp ../MODEL-LICENSE.txt LICENSE.txt

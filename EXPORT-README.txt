@@ -24,11 +24,17 @@ the CPU PyTorch wheel index is https://download.pytorch.org/whl/cpu.
 Run `python export_historical.py small.safetensors output` from this directory.
 No safetensors pickle loading or untrusted Python deserialization is involved.
 
-Expected output:
+Expected canonical output (Ubuntu 24.04 x86_64 GitHub Actions runner):
 historical-recognition.onnx 12974398 bytes
-SHA256 e8de47f398bd4f7943799c6bf84cc1a4093dd24ace8d23ff0a88ddc44011f57e
+SHA256 10904178b6ecf2dffe26d8e3f5873cd396929829e6e87e3c983d88ae2060349a
 historical-dictionary.json 10487 bytes
 SHA256 dc2070c479e38ccdce553fbfc96af26e6824333dcc969b8855875acd54f85fde
+
+A Windows CPU export with the same versions produces ONNX SHA256
+e8de47f398bd4f7943799c6bf84cc1a4093dd24ace8d23ff0a88ddc44011f57e.
+Its graph/metadata are identical; folded Conv weights differ only by floating-
+point rounding (maximum absolute difference 9.5367431640625e-7). All 62 verified
+Rust/RTen transcripts are byte-identical. The installer pins the Linux export.
 
 The ONNX output is [1, steps, 1623] softmax probabilities. Preprocessing is RGB,
 resize preserving aspect ratio to 96px height with Lanczos3, 16 white pixels of
