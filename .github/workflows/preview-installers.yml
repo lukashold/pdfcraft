@@ -1,0 +1,201 @@
+name: Preview installers
+
+on:
+  push:
+    branches: [codex/preview-installers]
+    paths:
+      - 'crates/**'
+      - 'apps/**'
+      - 'packaging/**'
+      - 'Cargo.*'
+      - '.github/workflows/preview-installers.yml'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Build installers, or test a completed installer run at this exact source revision
+        type: choice
+        default: build
+        options: [build, server-acceptance]
+      installer_run_id:
+        description: Successful installer run ID (required only for server-acceptance; same SHA)
+        type: string
+        default: ''
+      include_server_2019:
+        description: Also use the approved disposable self-hosted Server 2019 runner
+        type: boolean
+        default: false
+      server_2019_confirmation:
+        description: For 2019 enter exactly DISPOSABLE SERVER 2019
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-installers-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+  PDFCRAFT_BUILD_SHA: ${{ github.sha }}
+  PDFCRAFT_VERSION: 0.6.0-preview.20261011.5
+  PDFCRAFT_SYSTEM_FONTS: '0'
+
+jobs:
+  linux-processing:
+    if: github.event_name != 'workflow_dispatch' || inputs.mode != 'server-acceptance'
+    name: Linux processing and service credentials
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: preview-linux-processing
+          cache-on-failure: true
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libdbus-1-dev libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libgtk-3-dev
+      - name: Fetch standard OCR models
+        run: cargo xtask models
+      - name: Exercise processing, automation and export
+        run: |
+          cargo test -p pdfcraft-engine hot_folder
+          cargo test -p pdfcraft-automation --test hot_folder
+          cargo test -p pdfcraft-export
+      - name: Verify root provisioning preserves service ownership
+        run: |
+          cargo test -p pdfcraft-engine --lib --no-run --message-format=json > "$RUNNER_TEMP/engine-tests.json"
+          test_binary="$(jq -rs '[.[] | select(.reason == "compiler-artifact" and .profile.test == true and .target.name == "pdfcraft_engine") | .executable | select(. != null)] | last // empty' "$RUNNER_TEMP/engine-tests.json")"
+          test -n "$test_binary"
+          sudo "$test_binary" --exact hot_folder_sources::credentials::tests::unix_admin_provisioning_preserves_service_uid_gid_and_private_modes --ignored
+
+  windows:
+    if: github.event_name != 'workflow_dispatch' || inputs.mode != 'server-acceptance'
+    name: Windows ${{ matrix.arch }} offline Setup and MSI
+    runs-on: windows-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, target: x86_64-pc-windows-msvc }
+          - { arch: arm64, target: aarch64-pc-windows-msvc }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out approved Japanese fonts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: storytold/craft-fonts
+          ref: 8dcdacd5153e64560d109541a47d806f26f048c0
+          path: craft-fonts
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: preview-windows-${{ matrix.arch }}
+          cache-on-failure: true
+      - name: Install WiX
+        shell: pwsh
+        run: dotnet tool install --global wix --version 5.0.2
+      - name: Build and verify localized offline Setup and MSI with OCR models
+        shell: pwsh
+        env:
+          CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
+          CRAFT_FONTS_REQUIRED: '1'
+        run: ./packaging/windows/package.ps1 -Arch ${{ matrix.arch }}
+      - name: Compute checksums
+        shell: pwsh
+        run: |
+          $msi = @(Get-ChildItem -Path 'dist/release/*.msi' -File)
+          $setup = @(Get-ChildItem -Path 'dist/release/*-setup.exe' -File)
+          if ($msi.Count -ne 1 -or $setup.Count -ne 1) { throw 'Expected one verified MSI and one offline Setup.' }
+          @($msi + $setup) | ForEach-Object {
+            $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)" | Set-Content -Encoding ascii "$($_.FullName).sha256"
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pdfcraft-preview-windows-${{ matrix.arch }}
+          path: |
+            dist/release/*.msi
+            dist/release/*-setup.exe
+            dist/release/*.sha256
+          retention-days: 14
+          if-no-files-found: error
+
+  macos:
+    if: github.event_name != 'workflow_dispatch' || inputs.mode != 'server-acceptance'
+    name: macOS universal DMG and optional Hot Folder PKG
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out approved Japanese fonts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: storytold/craft-fonts
+          ref: 8dcdacd5153e64560d109541a47d806f26f048c0
+          path: craft-fonts
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: preview-macos-universal
+          cache-on-failure: true
+      - name: Build and verify ad-hoc signed apps, DMG and optional-component PKG
+        env:
+          CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
+          CRAFT_FONTS_REQUIRED: '1'
+        run: packaging/macos/package.sh --arch universal
+      - name: Verify both architectures and compute checksum
+        run: |
+          for binary in pdfcraft pdfcraft-cli pdfcraft-hot-folder; do
+            lipo "target/macos-package/bin/$binary" -verify_arch arm64 x86_64
+          done
+          installer -showChoicesXML -pkg "dist/release/pdfcraft-$PDFCRAFT_VERSION-macos-universal.pkg" -target / > target/macos-package/choices.plist
+          python3 - <<'PY'
+          import plistlib
+          with open('target/macos-package/choices.plist', 'rb') as source:
+              choices = plistlib.load(source)
+          def walk(items):
+              for item in items:
+                  yield item
+                  yield from walk(item.get('childItems', []))
+          hot = [item for item in walk(choices) if item.get('choiceIdentifier') == 'hot-folder']
+          assert len(hot) == 1 and not hot[0]['choiceIsSelected'], hot
+          PY
+          cd dist/release
+          shasum -a 256 ./*.dmg ./*.pkg > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pdfcraft-preview-macos-universal
+          path: |
+            dist/release/*.dmg
+            dist/release/*.pkg
+            dist/release/SHA256SUMS.txt
+          retention-days: 14
+          if-no-files-found: error
+
+  # A second explicit dispatch reuses completed artifacts; it does not rebuild
+  # or relax provenance checks. Local reusable workflows resolve at this SHA.
+  # Never add a PR/workflow_run route to the optional self-hosted 2019 runner.
+  server-acceptance:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'server-acceptance'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/hot-folder-server.yml
+    with:
+      installer_run_id: ${{ inputs.installer_run_id }}
+      expected_sha: ${{ github.sha }}
+      artifact_name: pdfcraft-preview-windows-x64
+      include_server_2019: ${{ inputs.include_server_2019 }}
+      server_2019_confirmation: ${{ inputs.server_2019_confirmation }}
