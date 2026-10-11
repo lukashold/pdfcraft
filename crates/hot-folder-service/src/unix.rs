@@ -191,6 +191,11 @@ pub fn uninstall() -> Result<(), String> {
 }
 
 pub fn run(config: &Path, worker: Worker) -> Result<(), String> {
+    let identity = command("/usr/bin/id", &["-u"])?;
+    let uid = String::from_utf8_lossy(&identity.stdout).trim().parse::<u32>().map_err(|_| "Could not determine the service account")?;
+    if !identity.status.success() || uid == 0 {
+        return Err("The Hot Folder worker must run under a non-root account; use the installed system service".into());
+    }
     let stopping = Arc::new(AtomicBool::new(false));
     let signal = stopping.clone();
     ctrlc::set_handler(move || signal.store(true, Ordering::SeqCst)).map_err(|e| e.to_string())?;

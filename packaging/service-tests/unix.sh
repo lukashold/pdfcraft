@@ -10,6 +10,11 @@ directory="$RUNNER_TEMP/Hot Folder service test"
 mkdir -m 700 "$directory"
 config="$directory/tasks.json"
 (umask 077; printf '{}\n' > "$config")
+if sudo "$probe" --service --config "$config" > "$directory/root-run.log" 2>&1; then
+  echo 'The processing worker must reject root execution' >&2; exit 1
+fi
+grep 'non-root account' "$directory/root-run.log"
+test ! -e "$directory/tasks.heartbeat"
 cleanup() { sudo "$probe" --service-action uninstall --config "$config" || true; }
 trap cleanup EXIT
 sudo "$probe" --service-action install --account "$(id -un)" --config "$config"
