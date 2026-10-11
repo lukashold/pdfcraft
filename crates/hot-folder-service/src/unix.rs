@@ -83,7 +83,7 @@ pub fn status(executable: &Path, config: &Path) -> Result<Status, String> {
         if !disabled.status.success() {
             return Err("Could not read launchd startup state".into());
         }
-        let enabled = !String::from_utf8_lossy(&disabled.stdout).contains(&format!("\"{}\" => true", crate::UNIX_LABEL));
+        let enabled = crate::definitions::launchd_enabled(&String::from_utf8_lossy(&disabled.stdout))?;
         let state = command("/bin/launchctl", &["print", &format!("system/{}", crate::UNIX_LABEL)])?;
         (enabled, state.status.success() && String::from_utf8_lossy(&state.stdout).contains("state = running"))
     };
@@ -143,7 +143,10 @@ pub fn install(executable: &Path, config: &Path, account: &str) -> Result<(), St
         let meta = std::fs::metadata(ancestor).map_err(|e| e.to_string())?;
         let trusted_admin_group = cfg!(target_os = "macos") && meta.gid() == 80;
         if meta.uid() != 0 || meta.mode() & 0o002 != 0 || (meta.mode() & 0o020 != 0 && !trusted_admin_group) {
-            return Err("Install the executable in a root-owned directory without group/other write access before registering its service".into());
+            return Err(format!(
+                "Install the executable in a root-owned directory without group/other write access before registering its service: {}",
+                ancestor.display()
+            ));
         }
     }
     let config_meta = std::fs::symlink_metadata(config).map_err(|e| format!("Create the task file for the service account first: {e}"))?;

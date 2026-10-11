@@ -1,0 +1,12 @@
+[[asset]]
+path = "assets/app-icon/pdfcraft.ico"
+title = "PdfCraft app icon (Windows .ico, 16-256 px)"
+author = "PdfCraft contributors (drawn by the project owner in ArtCraft; vectorised with craftrules vectorize_tile.py)"
+source = "Contributor-original (see assets/app-icon/README.md)"
+licence = "MIT OR Apache-2.0"
+licence_file = "assets/app-icon/LICENSE.txt"
+kind = "icon"
+usage = "Embedded in pdfcraft.exe by apps/pdfcraft/build.rs (Explorer, taskbar, Start menu, Alt-Tab)"
+sha256 = "56daaaae9ae5389794909570885809adf5e1d9183bef2d9669ed2f9bba3ed6f5"
+
+

@@ -47,6 +47,23 @@ pub fn systemd(executable: &str, config: &str, user: &str) -> Result<String, Str
 }
 
 #[cfg(any(target_os = "macos", test))]
+pub fn launchd_enabled(output: &str) -> Result<bool, String> {
+    let label = format!("\"{}\"", crate::UNIX_LABEL);
+    for line in output.lines() {
+        if let Some((key, value)) = line.trim().split_once("=>")
+            && key.trim() == label
+        {
+            return match value.trim() {
+                "true" | "disabled" => Ok(false),
+                "false" | "enabled" => Ok(true),
+                _ => Err("Unrecognized launchd startup state".into()),
+            };
+        }
+    }
+    Ok(true)
+}
+
+#[cfg(any(target_os = "macos", test))]
 fn xml(value: &str) -> String {
     value.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;").replace('\'', "&apos;")
 }
@@ -66,6 +83,17 @@ pub fn launchd(executable: &str, config: &str, user: &str) -> Result<String, Str
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn launchd_reads_both_boolean_and_modern_disabled_output() {
+        for value in ["true", "disabled"] {
+            assert!(!launchd_enabled(&format!("disabled services = {{\n\t\"{}\" => {value}\n}}", crate::UNIX_LABEL)).unwrap());
+        }
+        for value in ["false", "enabled"] {
+            assert!(launchd_enabled(&format!("\"{}\" => {value}", crate::UNIX_LABEL)).unwrap());
+        }
+        assert!(launchd_enabled("\"another.service\" => disabled").unwrap());
+        assert!(launchd_enabled(&format!("\"{}\" => unknown", crate::UNIX_LABEL)).is_err());
+    }
     #[test]
     fn generated_units_cannot_inject_arguments_or_run_as_root() {
         let text = systemd("/opt/Pdf Craft/worker", "/home/test/A%$B/tasks.json", "test").unwrap();

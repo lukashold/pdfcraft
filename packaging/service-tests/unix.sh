@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs only on disposable CI machines. Verifies real boot-service registration and termination.
 set -euo pipefail
-service_dir=/opt/pdfcraft-service-test
+service_dir=/Library/PdfCraftServiceTest
+if [ "$(uname -s)" = Linux ]; then service_dir=/usr/lib/pdfcraft-service-test; fi
 sudo install -d -m 755 "$service_dir"
 sudo install -m 755 target/debug/examples/service_probe "$service_dir/pdfcraft-hot-folder"
 probe="$service_dir/pdfcraft-hot-folder"
