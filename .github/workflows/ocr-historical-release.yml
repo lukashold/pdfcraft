@@ -52,6 +52,14 @@ jobs:
           sha256sum LICENSE.txt MODEL-NOTICE.txt >> SHA256SUMS.txt
           cd ..
           zip -r release/historical-export-source.zip export_historical.py EXPORT-README.txt LICENSE-APACHE LICENSE-MIT kraken_ppocr -x '*/__pycache__/*'
+      - name: Retain conversion for reproducibility checks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: historical-conversion
+          path: release/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Publish optional model resources
         env:
           GH_REPO: ${{ github.repository }}
