@@ -51,6 +51,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: preview-windows-${{ matrix.arch }}
+          cache-on-failure: true
       - name: Install WiX
         shell: pwsh
         run: dotnet tool install --global wix --version 5.0.2
@@ -94,6 +95,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: preview-macos-universal
+          cache-on-failure: true
       - name: Build and verify ad-hoc signed DMG with OCR models
         env:
           CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
@@ -101,7 +103,7 @@ jobs:
         run: packaging/macos/package.sh --arch universal
       - name: Verify both architectures and compute checksum
         run: |
-          lipo -verify_arch arm64 x86_64 target/macos-package/bin/pdfcraft
+          lipo target/macos-package/bin/pdfcraft -verify_arch arm64 x86_64
           cd dist/release
           shasum -a 256 *.dmg > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
