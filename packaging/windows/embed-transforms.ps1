@@ -1,11 +1,12 @@
 # Update only a build artifact; a separate process releases all MSI stream handles.
 param([Parameter(Mandatory)] [string] $Msi, [Parameter(Mandatory)] [string] $Work)
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'installer-languages.ps1')
 $installer = New-Object -ComObject WindowsInstaller.Installer
 $database = $null
 try {
   $database = $installer.OpenDatabase($Msi, 1)
-  foreach ($language in @('de', 'fr', 'es', 'nl', 'it', 'hu')) {
+  foreach ($language in $InstallerTransformKeys) {
     $view = $database.OpenView('INSERT INTO `_Storages` (`Name`, `Data`) VALUES (?, ?)')
     try {
       $record = $installer.CreateRecord(2)
@@ -18,7 +19,7 @@ try {
   # Summary; ProductLanguage is still the English base until a transform is applied.
   $summary = $database.SummaryInformation(1)
   $platform = ($summary.Property(7) -split ';')[0]
-  $summary.Property(7) = "$platform;1033,1031,1036,3082,1043,1040,1038"
+  $summary.Property(7) = "$platform;$InstallerLanguageIds"
   [void] $summary.Persist()
   [void] $database.Commit()
 } finally {

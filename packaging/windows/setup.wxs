@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Offline bootstrapper: one MSI, six embedded language transforms, native MSI UI.
+<!-- Offline bootstrapper: one MSI, embedded language transforms, native MSI UI.
      No downloaded payloads, custom action DLLs, artwork, or language prompt. -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
   <Bundle Name="PdfCraft" Manufacturer="lukashold (preview build)" Version="$(var.Version)"

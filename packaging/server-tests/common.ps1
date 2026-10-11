@@ -4,6 +4,17 @@ function Assert-That([bool] $Condition, [string] $Message) {
     if (-not $Condition) { throw $Message }
 }
 
+function Assert-CleanupSucceeded([string[]] $Errors, [bool] $HadPrimaryFailure) {
+    if (-not $Errors.Count) { return }
+    $message = "Acceptance cleanup failed: $($Errors -join '; ')"
+    if ($HadPrimaryFailure) { Write-Warning $message }
+    else { throw $message }
+}
+
+function Assert-ProductCode($Value) {
+    Assert-That ($Value -is [string] -and $Value -cmatch '^\{[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}$') 'Expected exactly one braced MSI ProductCode GUID.'
+}
+
 function Assert-SourceUnchanged([string] $Path, [string] $ExpectedHash, [string] $Context) {
     Assert-That (Test-Path -LiteralPath $Path -PathType Leaf) "$Context removed the original source."
     Assert-That ((Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash -eq $ExpectedHash) "$Context changed the original source bytes."
@@ -135,16 +146,22 @@ function Set-PrivateDirectory([string] $Path, [string[]] $ExtraSids = @()) {
 }
 
 function Get-ProductCode([string] $Msi) {
-    $installer = New-Object -ComObject WindowsInstaller.Installer
-    $database = $installer.OpenDatabase($Msi, 0)
+    $installer = $database = $view = $record = $null
     try {
+        $installer = New-Object -ComObject WindowsInstaller.Installer
+        $database = $installer.OpenDatabase($Msi, 0)
         $view = $database.OpenView('SELECT `Value` FROM `Property` WHERE `Property` = ''ProductCode''')
         [void] $view.Execute()
-        return $view.Fetch().StringData(1)
+        $record = $view.Fetch()
+        Assert-That ($null -ne $record) 'MSI has no ProductCode.'
+        $product = $record.StringData(1)
+        Assert-ProductCode $product
+        return $product
     } finally {
-        if ($view) { [void] $view.Close() }
-        [void] [Runtime.InteropServices.Marshal]::FinalReleaseComObject($database)
-        [void] [Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer)
+        if ($null -ne $view) { [void] $view.Close() }
+        foreach ($item in @($record, $view, $database, $installer)) {
+            if ($null -ne $item) { [void] [Runtime.InteropServices.Marshal]::FinalReleaseComObject($item) }
+        }
     }
 }
 
@@ -152,21 +169,27 @@ function New-UpgradeFixture([string] $Msi, [string] $Destination) {
     # Identical real packaged binaries; changed MSI identities exercise a genuine
     # same-version MajorUpgrade, not REINSTALL/repair. Never publish this fixture.
     Copy-Item -LiteralPath $Msi -Destination $Destination
-    $installer = New-Object -ComObject WindowsInstaller.Installer
-    $database = $installer.OpenDatabase($Destination, 1)
+    $installer = $database = $view = $summary = $null
     try {
+        $installer = New-Object -ComObject WindowsInstaller.Installer
+        $database = $installer.OpenDatabase($Destination, 1)
         $product = '{' + [guid]::NewGuid().ToString().ToUpperInvariant() + '}'
         $view = $database.OpenView('UPDATE `Property` SET `Value` = ''' + $product + ''' WHERE `Property` = ''ProductCode''')
         [void] $view.Execute()
         [void] $view.Close()
         $summary = $database.SummaryInformation(20)
         $summary.Property(9) = '{' + [guid]::NewGuid().ToString().ToUpperInvariant() + '}'
-        $summary.Persist()
-        $database.Commit()
+        # COM's empty results must not become extra pipeline values alongside
+        # the GUID (which would make cleanup pass an invalid product to msiexec).
+        [void] $summary.Persist()
+        [void] $database.Commit()
+        Assert-ProductCode $product
         return $product
     } finally {
-        if ($summary) { [void] [Runtime.InteropServices.Marshal]::FinalReleaseComObject($summary) }
-        [void] [Runtime.InteropServices.Marshal]::FinalReleaseComObject($database)
-        [void] [Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer)
+        # A live view retains the database's exclusive storage lock even after
+        # Database is released. Release every dependent RCW before msiexec runs.
+        foreach ($item in @($summary, $view, $database, $installer)) {
+            if ($null -ne $item) { [void] [Runtime.InteropServices.Marshal]::FinalReleaseComObject($item) }
+        }
     }
 }

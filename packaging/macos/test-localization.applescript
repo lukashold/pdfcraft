@@ -11,7 +11,7 @@ on run arguments
     repeat with resourceName in (names as list)
         if resourceName ends with ".lproj" then set end of available to text 1 thru -7 of resourceName
     end repeat
-    set cases to {{"en-AU", "en"}, {"de-AT", "de"}, {"fr-CA", "fr"}, {"es-MX", "es"}, {"nl-BE", "nl"}, {"it-CH", "it"}, {"hu-HU", "hu"}, {"ja-JP", "ja"}, {"ru-RU", "ru"}, {"pt-BR", "pt"}, {"zh-TW", "zh-Hant"}}
+    set cases to {{"en-AU", "en"}, {"de-AT", "de"}, {"fr-CA", "fr"}, {"es-MX", "es"}, {"nl-BE", "nl"}, {"it-CH", "it"}, {"hu-HU", "hu"}, {"ja-JP", "ja"}, {"ru-RU", "ru"}, {"pt-BR", "pt"}, {"pt-PT", "pt"}, {"zh-CN", "zh-Hans"}, {"zh-SG", "zh-Hans"}, {"zh-TW", "zh-Hant"}, {"zh-HK", "zh-Hant"}, {"zh-MO", "zh-Hant"}, {"hi-IN", "hi"}, {"bn-BD", "bn"}, {"ar-EG", "ar"}, {"id-ID", "id"}, {"ur-PK", "ur"}, {"ko-KR", "ko"}, {"tr-TR", "tr"}, {"pl-PL", "pl"}, {"sv-SE", "sv"}}
     repeat with testCase in cases
         set preferred to current application's NSBundle's preferredLocalizationsFromArray:available forPreferences:{item 1 of testCase, "de", "en"}
         set chosen to item 1 of (preferred as list)
@@ -22,7 +22,7 @@ on run arguments
         set descriptionKey to "Install the PdfCraft application for working with PDF documents."
         set localizedDescription to localizationTable's objectForKey:descriptionKey
         if localizedDescription is missing value then error "Missing PdfCraft choice description: " & chosen
-        if chosen is in {"en", "ja", "ru", "pt", "zh-Hant"} then
+        if chosen is in {"en", "pl", "sv"} then
             if (localizedDescription as text) is not descriptionKey then error "Non-English unsupported-language fallback: " & chosen
         else
             if (localizedDescription as text) is descriptionKey then error "Missing translated choice description: " & chosen

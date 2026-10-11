@@ -54,6 +54,7 @@ $password = $null
 $accountCreated = $false
 $privilegeChanged = $false
 $installed = $false
+$primaryFailure = $false
 $productCodes = [Collections.Generic.List[string]]::new()
 $evidence = [ordered]@{
     result = 'running'; os = $os.Caption; build = $os.BuildNumber
@@ -311,6 +312,7 @@ try {
     Copy-Item -LiteralPath ([IO.Path]::ChangeExtension($script:Config, 'state.json')) -Destination (Join-Path $script:Results 'final-state.json')
     $evidence.result = 'passed'
 } catch {
+    $primaryFailure = $true
     $evidence.result = 'failed'
     $evidence.error = $_.Exception.Message
     throw
@@ -333,6 +335,7 @@ try {
     if ($installed -or (Test-Path -LiteralPath $marker)) {
         foreach ($code in $productCodes) {
             Cleanup-Step {
+                Assert-ProductCode $code
                 [void] (Invoke-Program $msiExe @('/x', $code, '/qn', '/norestart', '/L*v', (Join-Path $script:Results "uninstall-$($code.Trim('{}')).log")) ('uninstall-' + $code.Trim('{}')) 180 @(0, 1605, 1614, 3010))
             }
         }
@@ -359,5 +362,5 @@ try {
         [void] (Assert-SafePath $script:TestRoot $env:RUNNER_TEMP)
         Remove-Item -LiteralPath $script:TestRoot -Recurse -Force
     }
-    if ($cleanupErrors.Count) { throw "Acceptance cleanup failed: $($cleanupErrors -join '; ')" }
+    Assert-CleanupSucceeded @($cleanupErrors) $primaryFailure
 }

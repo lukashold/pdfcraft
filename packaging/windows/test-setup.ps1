@@ -13,7 +13,7 @@ if ($packages.Count -ne 1) { throw 'Setup must contain exactly one MSI' }
 $properties = @($packages[0].SelectNodes('*[local-name()="MsiProperty" and @Id="TRANSFORMS"]'))
 if ($properties.Count -ne 1 -or $properties[0].Id -ne 'TRANSFORMS' -or $properties[0].Value -ne '[LanguageTransform]') { throw 'Missing native MSI language transform property' }
 $searches = @($root.SelectNodes('//*[local-name()="SetVariable"]'))
-if ($searches.Count -ne 6) { throw 'Expected six compiled language selectors' }
+if ($searches.Count -ne $InstallerTransformKeys.Count) { throw 'Missing compiled language selectors' }
 $map = @{}
 foreach ($search in $searches) {
   if ($search.Variable -ne 'LanguageTransform' -or $search.Type -ne 'string') { throw 'Unexpected language variable' }
@@ -32,10 +32,14 @@ for ($id = 0; $id -le 65535; $id++) {
   $selected = if ($map.ContainsKey($id)) { $map[$id] } else { 'en' }
   if ($selected -cne (Get-InstallerLanguage $id)) { throw "Incorrect fallback for LANGID $id" }
 }
-foreach ($culture in @('de-AT', 'fr-CA', 'es-MX', 'nl-BE', 'it-CH', 'hu-HU', 'en-AU', 'ja-JP')) {
-  $native = [Globalization.CultureInfo]::GetCultureInfo($culture)
-  $expected = if ($InstallerLanguages.ContainsKey($native.TwoLetterISOLanguageName)) { $native.TwoLetterISOLanguageName } else { 'en' }
-  if ((Get-InstallerLanguage $native.LCID) -ne $expected) { throw "Regional locale failure: $culture" }
+foreach ($case in @(
+    @('de-AT','de'), @('fr-CA','fr'), @('es-MX','es'), @('nl-BE','nl'), @('it-CH','it'), @('hu-HU','hu'),
+    @('en-AU','en'), @('ja-JP','ja'), @('zh-CN','zh-Hans'), @('zh-SG','zh-Hans'),
+    @('zh-TW','zh-Hant'), @('zh-HK','zh-Hant'), @('zh-MO','zh-Hant'), @('zh-Hans','zh-Hans'), @('zh-Hant','zh-Hant'),
+    @('hi-IN','hi'), @('bn-BD','bn'), @('pt-PT','pt'), @('pt-BR','pt'), @('ar-EG','ar'),
+    @('ru-RU','ru'), @('id-ID','id'), @('ur-PK','ur'), @('ko-KR','ko'), @('tr-TR','tr'), @('pl-PL','en'))) {
+  $native = [Globalization.CultureInfo]::GetCultureInfo($case[0])
+  if ((Get-InstallerLanguage $native.LCID) -ne $case[1]) { throw "Regional locale failure: $($case[0])" }
 }
 $msiFiles = @(Get-ChildItem (Join-Path $Work 'payload') -Filter *.msi -Recurse)
 if ($msiFiles.Count -ne 1 -or (Get-FileHash $msiFiles[0].FullName).Hash -ne (Get-FileHash $Msi).Hash) { throw 'Embedded MSI is not the validated offline payload' }

@@ -14,6 +14,25 @@ $rejected = $false
 try { [void] (Assert-SafePath ($boundary + '-sibling/file') $boundary) } catch { $rejected = $true }
 Assert-That $rejected 'Sibling-prefix confinement must reject paths outside the test root.'
 
+$guid = '{A9C59D9B-69EB-4AB0-BEA5-419C001B785E}'
+Assert-ProductCode $guid
+foreach ($invalid in @('', "  $guid", @($null, $null, $guid), "$guid extra", $guid.Trim('{}'))) {
+    $rejected = $false
+    try { Assert-ProductCode $invalid } catch { $rejected = $true }
+    Assert-That $rejected 'Cleanup must reject a malformed or contaminated ProductCode.'
+}
+Assert-CleanupSucceeded @() $false
+try {
+    try { throw 'original acceptance failure' }
+    finally { Assert-CleanupSucceeded @('secondary cleanup failure') $true 3>$null }
+} catch { Assert-That ($_.Exception.Message -ceq 'original acceptance failure') 'Cleanup masked the original failure.' }
+$rejected = $false
+try { Assert-CleanupSucceeded @('cleanup-only failure') $false } catch {
+    $rejected = $_.Exception.Message -ceq 'Acceptance cleanup failed: cleanup-only failure'
+}
+Assert-That $rejected 'Cleanup-only failure must still fail acceptance.'
+if ($IsWindows) { & "$PSScriptRoot/check-msi-database.ps1" }
+
 # The CLI expects an array even for zero or one step. Passing values through the
 # PowerShell pipeline silently unwraps a one-element array before serialization.
 $script:TestRoot = Join-Path ([IO.Path]::GetTempPath()) ('pdfcraft-server-harness-' + [guid]::NewGuid().ToString('N'))
@@ -120,5 +139,5 @@ try {
     if ($previousCase) { $global:PdfcraftServerProvenanceCase = $previousCase.Value }
     else { Remove-Variable -Name PdfcraftServerProvenanceCase -Scope Global }
 }
-Write-Output 'ok: parser, safe-path confinement, JSON script cardinality, source preservation and eight provenance scenarios; no service or installer executed'
+Write-Output 'ok: parser, confinement, strict MSI GUIDs, cleanup error preservation, JSON cardinality, source preservation and eight provenance scenarios; no service or installer executed'
 if ($Cli) { Write-Output 'ok: real CLI executed empty, single and multiple read-only status scripts' }

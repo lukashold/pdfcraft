@@ -133,9 +133,12 @@ Ranked; detail and the full milestone table in [docs/roadmap.md](docs/roadmap.md
 
 ## Progress log
 
+- **2026-10-11 (M14, combined preview .7):** Integrate the 19-language native Windows/macOS installers and the server acceptance harness corrections. Native MSI preview coverage verifies exact Unicode text, native identity and visible bounds for Hindi, Bengali and Urdu; it does not claim checkbox interaction or full script-shaping qualification. Server 2022/2025 passed the ten local/OCR/recovery/authenticated-SMB stages before a test-only upgrade-fixture lock failure; the corrected full upgrade acceptance still requires a fresh artifact-backed run.
+
 - 2026-10-11 — M5: shared touch/pen toolbar, persistent Auto/On/Off preference, intra-frame ink sampling, pen dots and two-finger navigation without accidental marks. Synthetic GUI and saved-PDF regressions; physical-device, pressure and palm-rejection claims remain excluded. See [touch and pen](docs/touch-and-pen.md).
 
 - **2026-10-11 (M14, combined preview .5):** Prepare the hardened Hot Folder service and seven-language offline Windows Setup/MSI and native macOS PKG dialogs for combined preview builds. Preserve opt-in service/model choices, historical OCR, fork branding and embedded-font notices; actual server acceptance remains a separate artifact-backed workflow.
+- 2026-10-11 — M14: expand the existing Windows/macOS installer catalogs from seven to 19 languages, preserving primary-system-language selection and English fallback. Distinguish Chinese scripts; mirror native Arabic/Urdu dialogs. Document MSI transforms, quiet/GPO deployment, reboot/exit handling and optional-service administration. Packaging checks inspect actual MSI/Setup contents; per-language visual and domain deployment acceptance remain separate.
 
 - 2026-10-11 — M13: Hot Folder server hardening: isolated bounded task processes, Windows job memory limits, automatic transient retries, durable bounded active journals, crash-safe grouped receipts and deterministic OCR replay. Stable service SID grants preserve custom SCM accounts through repair/upgrade. Added manual real-MSI local/SMB acceptance for Server 2022/2025 and opt-in disposable Server 2019; no untested server certification is claimed.
 

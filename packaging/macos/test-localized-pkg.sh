@@ -14,8 +14,8 @@ sed 's/@SHORT_VERSION@/0.6.0/g' "$here/Distribution.xml.in" > "$work/Distributio
 bash "$here/prepare-resources.sh" "$work/resources"
 productbuild --distribution "$work/Distribution.xml" --package-path "$work/components" --resources "$work/resources" "$work/localized.pkg"
 pkgutil --expand "$work/localized.pkg" "$work/expanded"
-for language in en de fr es nl it hu; do
-  cmp "$here/resources/$language.lproj/Localizable.strings" "$work/expanded/Resources/$language.lproj/Localizable.strings"
+for source in "$here/resources/"*.lproj; do
+  cmp "$source/Localizable.strings" "$work/expanded/Resources/$(basename "$source")/Localizable.strings"
 done
 osascript "$here/test-localization.applescript" "$work/expanded/Resources"
 # The default-off service choice must survive productbuild, not merely source parsing.

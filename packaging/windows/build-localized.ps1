@@ -26,9 +26,12 @@ $productCode = [Guid]::NewGuid().ToString('B').ToUpperInvariant()
 Invoke-Wix @('extension', 'add', '-g', 'WixToolset.Util.wixext/5.0.2')
 Invoke-Wix @('extension', 'add', '-g', 'WixToolset.BootstrapperApplications.wixext/5.0.2')
 $languageFiles = @{}
-foreach ($language in @('en', 'de', 'fr', 'es', 'nl', 'it', 'hu')) {
+$rtlUI = Join-Path $Work 'installer-ui-rtl.wxs'
+Write-InstallerRtlUI $rtlUI
+foreach ($language in $InstallerLanguageKeys) {
   $path = Join-Path $Work "$language.msi"
-  Invoke-Wix @('build', (Join-Path $PSScriptRoot 'pdfcraft.wxs'), (Join-Path $PSScriptRoot 'installer-ui.wxs'),
+  $uiPath = if ($InstallerLanguages[$language].rtl) { $rtlUI } else { Join-Path $PSScriptRoot 'installer-ui.wxs' }
+  Invoke-Wix @('build', (Join-Path $PSScriptRoot 'pdfcraft.wxs'), $uiPath,
     '-arch', $Arch, '-ext', 'WixToolset.Util.wixext', '-loc', (Join-Path $PSScriptRoot "locales/$language.wxl"),
     '-cc', (Join-Path $Work 'cab-cache'), '-d', "ProductCode=$productCode", '-d', "Version=$Version",
     '-d', "BinDir=$BinDir", '-d', "ModelsDir=$ModelsDir", '-d', "IconPath=$IconPath", '-o', $path)
@@ -36,7 +39,7 @@ foreach ($language in @('en', 'de', 'fr', 'es', 'nl', 'it', 'hu')) {
   if ($language -ne 'en') {
     Invoke-Wix @('msi', 'transform', '-t', 'language', $languageFiles.en, $path, '-o', (Join-Path $Work "$language.mst"))
     # OCR payloads are large. Keep only the base plus the current localization,
-    # not seven copies of the same models on a size-limited release runner.
+    # not one copy per language on a size-limited release runner.
     Remove-Item -LiteralPath $path
   }
   Remove-Item -LiteralPath ([IO.Path]::ChangeExtension($path, '.wixpdb')) -ErrorAction SilentlyContinue
@@ -51,9 +54,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Localized MSI validation failed' }
 & (Join-Path $PSScriptRoot 'sign.ps1') $Msi
 
 $properties = @('<Include xmlns="http://wixtoolset.org/schemas/v4/wxs">')
-foreach ($language in @('de', 'fr', 'es', 'nl', 'it', 'hu')) {
+foreach ($language in $InstallerTransformKeys) {
   $condition = Get-InstallerLanguageCondition $language
-  $properties += "  <SetVariable Id=`"Language_$language`" Variable=`"LanguageTransform`" Type=`"string`" Value=`":$language.mst`" Condition=`"$condition`" />"
+  $selectorId = 'Language_' + $language.Replace('-', '_')
+  $properties += "  <SetVariable Id=`"$selectorId`" Variable=`"LanguageTransform`" Type=`"string`" Value=`":$language.mst`" Condition=`"$condition`" />"
 }
 $properties += '</Include>'
 $include = Join-Path $Work 'language-properties.wxi'

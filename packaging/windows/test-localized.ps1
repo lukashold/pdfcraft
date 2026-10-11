@@ -24,7 +24,7 @@ function Equal($Actual, $Expected, [string] $What) {
 try {
   [xml] $ui = Get-Content (Join-Path $PSScriptRoot 'installer-ui.wxs') -Raw -Encoding utf8
   $productCode = $null
-  foreach ($language in @('en', 'de', 'fr', 'es', 'nl', 'it', 'hu')) {
+  foreach ($language in $InstallerLanguageKeys) {
     $copy = Join-Path $Work "verify-$language.msi"
     Copy-Item -LiteralPath $Msi -Destination $copy -Force
     $database = $installer.OpenDatabase($copy, 1)
@@ -40,15 +40,23 @@ try {
       if ($codepage -notmatch '(?m)^(\d+)\t_ForceCodepage') { throw 'Missing MSI database codepage' }
       Equal $Matches[1] ([string] $InstallerLanguages[$language].codepage) "$language database codepage"
       $summary = $database.SummaryInformation(0)
-      Equal (($summary.Property(7) -split ';')[1]) '1033,1031,1036,3082,1043,1040,1038' 'Multilingual package summary'
+      Equal (($summary.Property(7) -split ';')[1]) $InstallerLanguageIds 'Multilingual package summary'
       [void] [Runtime.InteropServices.Marshal]::FinalReleaseComObject($summary)
       Equal (Read-Value $database 'SELECT `Value` FROM `Property` WHERE `Property` = ''ProductLanguage''') ([string] $InstallerLanguages[$language].language) "$language ProductLanguage"
       $code = Read-Value $database 'SELECT `Value` FROM `Property` WHERE `Property` = ''ProductCode'''
       if ($productCode) { Equal $code $productCode "$language ProductCode" } else { $productCode = $code }
       foreach ($dialog in $ui.Wix.Fragment.UI.Dialog) {
+        $rtl = [bool] $InstallerLanguages[$language].rtl
+        $attributes = [int] (Read-Value $database ('SELECT `Attributes` FROM `Dialog` WHERE `Dialog` = ''' + $dialog.Id + ''''))
+        Equal ([bool] ($attributes -band 128)) $rtl "$language $($dialog.Id) dialog RTL"
         $expectedTitle = [regex]::Replace($dialog.Title, '!\(loc\.([A-Za-z]+)\)', { param($m) $strings[$m.Groups[1].Value] })
         Equal (Read-Value $database ('SELECT `Title` FROM `Dialog` WHERE `Dialog` = ''' + $dialog.Id + '''')) $expectedTitle "$language $($dialog.Id) title"
         foreach ($control in $dialog.Control) {
+          $where = ' WHERE `Dialog_` = ''' + $dialog.Id + ''' AND `Control` = ''' + $control.Id + ''''
+          $attributes = [int] (Read-Value $database ('SELECT `Attributes` FROM `Control`' + $where))
+          Equal ([bool] ($attributes -band 32)) $rtl "$language $($dialog.Id).$($control.Id) control RTL"
+          $expectedX = if ($rtl) { [int] $dialog.Width - [int] $control.X - [int] $control.Width } else { [int] $control.X }
+          Equal ([int] (Read-Value $database ('SELECT `X` FROM `Control`' + $where))) $expectedX "$language $($dialog.Id).$($control.Id) mirrored bounds"
           if (-not $control.Text) { continue }
           $expected = [regex]::Replace($control.Text, '!\(loc\.([A-Za-z]+)\)', { param($m) $strings[$m.Groups[1].Value] })
           $actual = Read-Value $database ('SELECT `Text` FROM `Control` WHERE `Dialog_` = ''' + $dialog.Id + ''' AND `Control` = ''' + $control.Id + '''')
