@@ -2,7 +2,7 @@
 # service executable, then test opt-in installation and component removal.
 $ErrorActionPreference = 'Stop'
 $stage = Join-Path $env:RUNNER_TEMP 'hot-folder-msi'
-New-Item -ItemType Directory -Path "$stage/models" -Force | Out-Null
+New-Item -ItemType Directory -Path "$stage/models", "$stage/licences" -Force | Out-Null
 foreach ($name in 'pdfcraft.exe', 'pdfcraft-cli.exe', 'pdfcraft-hot-folder.exe') {
   Copy-Item -LiteralPath 'target/debug/examples/service_probe.exe' -Destination (Join-Path $stage $name)
 }
@@ -11,12 +11,13 @@ Copy-Item -LiteralPath 'assets/app-icon/LICENSE-document.txt' -Destination $stag
 Get-Content assets/fonts/OFL-*.txt | Set-Content -Encoding utf8 (Join-Path $stage 'LICENSE-fonts.txt')
 Set-Content -LiteralPath "$stage/models/detection.rten" -Value 'synthetic installer fixture; never an OCR model'
 Set-Content -LiteralPath "$stage/models/recognition.rten" -Value 'synthetic installer fixture; never an OCR model'
+Set-Content -LiteralPath "$stage/licences/FONTS.txt" -Value 'Synthetic service installer fixture.'
 $msi = Join-Path $stage 'service-test.msi'
 $upgrade = Join-Path $stage 'service-test-upgrade.msi'
 $installedMsi = $msi
 & wix extension add -g WixToolset.Util.wixext/5.0.2
 if ($LASTEXITCODE -ne 0) { throw 'WiX extension installation failed' }
-& wix build packaging/windows/pdfcraft.wxs packaging/windows/installer-ui.wxs -loc packaging/windows/locales/en.wxl -arch x64 -ext WixToolset.Util.wixext -d Version=0.6.0 -d "BinDir=$stage" -d "ModelsDir=$stage/models" -d 'IconPath=assets/app-icon/pdfcraft.ico' -o $msi
+& wix build packaging/windows/pdfcraft.wxs packaging/windows/installer-ui.wxs -loc packaging/windows/locales/en.wxl -arch x64 -ext WixToolset.Util.wixext -d Version=0.6.0 -d "BinDir=$stage" -d "ModelsDir=$stage/models" -d "FontLicencesDir=$stage/licences" -d 'IconPath=assets/app-icon/pdfcraft.ico' -o $msi
 if ($LASTEXITCODE -ne 0) { throw 'WiX compilation failed' }
 & pwsh -NoProfile -File packaging/windows/test-msi.ps1 $msi
 if ($LASTEXITCODE -ne 0) { throw 'Compiled MSI validation failed' }
@@ -25,7 +26,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Compiled MSI validation failed' }
 $probeStream = [IO.File]::Open("$stage/pdfcraft-hot-folder.exe", [IO.FileMode]::Append)
 try { $probeStream.Write([Text.Encoding]::ASCII.GetBytes('synthetic upgrade payload')) } finally { $probeStream.Dispose() }
 $upgradeHash = (Get-FileHash -LiteralPath "$stage/pdfcraft-hot-folder.exe" -Algorithm SHA256).Hash
-& wix build packaging/windows/pdfcraft.wxs packaging/windows/installer-ui.wxs -loc packaging/windows/locales/en.wxl -arch x64 -ext WixToolset.Util.wixext -d Version=0.6.1 -d "BinDir=$stage" -d "ModelsDir=$stage/models" -d 'IconPath=assets/app-icon/pdfcraft.ico' -o $upgrade
+& wix build packaging/windows/pdfcraft.wxs packaging/windows/installer-ui.wxs -loc packaging/windows/locales/en.wxl -arch x64 -ext WixToolset.Util.wixext -d Version=0.6.1 -d "BinDir=$stage" -d "ModelsDir=$stage/models" -d "FontLicencesDir=$stage/licences" -d 'IconPath=assets/app-icon/pdfcraft.ico' -o $upgrade
 if ($LASTEXITCODE -ne 0) { throw 'Upgrade MSI compilation failed' }
 function Invoke-Msi([string] $Options, [string] $Name) {
   $log = Join-Path $stage "$Name.log"

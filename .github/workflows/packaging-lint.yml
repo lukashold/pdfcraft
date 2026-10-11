@@ -35,10 +35,15 @@ jobs:
           "$RUNNER_TEMP/actionlint" -color
       - name: shellcheck
         run: shellcheck packaging/*.sh packaging/*/*.sh packaging/macos/hot-folder-scripts/*
+      - name: Font licences in packages
+        run: bash packaging/tests/font-licences.sh
+      - name: Font licences in Windows packages
+        shell: pwsh
+        run: ./packaging/tests/font-licences.ps1
       - name: PowerShell
         shell: pwsh
         run: |
-          foreach ($f in Get-ChildItem packaging/windows/*.ps1) {
+          foreach ($f in Get-ChildItem packaging/windows/*.ps1, packaging/tests/*.ps1) {
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$errors) | Out-Null
             if ($errors) { $errors | ForEach-Object { Write-Output "::error file=$($f.Name)::$_" }; exit 1 }

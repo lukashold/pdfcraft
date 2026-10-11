@@ -7,6 +7,7 @@ param(
   [string] $BundleVersion = $Version,
   [Parameter(Mandatory)] [string] $BinDir,
   [Parameter(Mandatory)] [string] $ModelsDir,
+  [Parameter(Mandatory)] [string] $FontLicencesDir,
   [Parameter(Mandatory)] [string] $IconPath,
   [Parameter(Mandatory)] [string] $Msi,
   [Parameter(Mandatory)] [string] $Setup,
@@ -34,7 +35,7 @@ foreach ($language in $InstallerLanguageKeys) {
   Invoke-Wix @('build', (Join-Path $PSScriptRoot 'pdfcraft.wxs'), $uiPath,
     '-arch', $Arch, '-ext', 'WixToolset.Util.wixext', '-loc', (Join-Path $PSScriptRoot "locales/$language.wxl"),
     '-cc', (Join-Path $Work 'cab-cache'), '-d', "ProductCode=$productCode", '-d', "Version=$Version",
-    '-d', "BinDir=$BinDir", '-d', "ModelsDir=$ModelsDir", '-d', "IconPath=$IconPath", '-o', $path)
+    '-d', "BinDir=$BinDir", '-d', "ModelsDir=$ModelsDir", '-d', "FontLicencesDir=$FontLicencesDir", '-d', "IconPath=$IconPath", '-o', $path)
   $languageFiles[$language] = $path
   if ($language -ne 'en') {
     Invoke-Wix @('msi', 'transform', '-t', 'language', $languageFiles.en, $path, '-o', (Join-Path $Work "$language.mst"))

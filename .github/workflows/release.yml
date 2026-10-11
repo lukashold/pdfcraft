@@ -72,12 +72,13 @@ jobs:
       PDFCRAFT_BUILD_DATE: ${{ needs.version.outputs.date }}
     steps:
       - uses: actions/checkout@v4
-      # The craft-fonts build input (Japanese fonts): every release embeds it. Bump deliberately.
+      # The craft-fonts build input (Japanese, Chinese, Arabic/Urdu, Indic and Korean fonts): every release embeds it.
+      # Bump deliberately; the faces it must have are asserted by the crates/fonts and ui-egui tests.
       - name: Check out craft-fonts
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          repository: storytold/craft-fonts
-          ref: 8dcdacd5153e64560d109541a47d806f26f048c0
+          repository: lukashold/craft-fonts
+          ref: 9e89a056b92666d14ba70cd1c0811d9cfb6777fe
           path: craft-fonts
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -133,12 +134,13 @@ jobs:
       PDFCRAFT_BUILD_DATE: ${{ needs.version.outputs.date }}
     steps:
       - uses: actions/checkout@v4
-      # The craft-fonts build input (Japanese fonts): every release embeds it. Bump deliberately.
+      # The craft-fonts build input (Japanese, Chinese, Arabic/Urdu, Indic and Korean fonts): every release embeds it.
+      # Bump deliberately; the faces it must have are asserted by the crates/fonts and ui-egui tests.
       - name: Check out craft-fonts
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          repository: storytold/craft-fonts
-          ref: 8dcdacd5153e64560d109541a47d806f26f048c0
+          repository: lukashold/craft-fonts
+          ref: 9e89a056b92666d14ba70cd1c0811d9cfb6777fe
           path: craft-fonts
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -199,12 +201,13 @@ jobs:
       NFPM_VERSION: 2.47.0
     steps:
       - uses: actions/checkout@v4
-      # The craft-fonts build input (Japanese fonts): every release embeds it. Bump deliberately.
+      # The craft-fonts build input (Japanese, Chinese, Arabic/Urdu, Indic and Korean fonts): every release embeds it.
+      # Bump deliberately; the faces it must have are asserted by the crates/fonts and ui-egui tests.
       - name: Check out craft-fonts
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          repository: storytold/craft-fonts
-          ref: 8dcdacd5153e64560d109541a47d806f26f048c0
+          repository: lukashold/craft-fonts
+          ref: 9e89a056b92666d14ba70cd1c0811d9cfb6777fe
           path: craft-fonts
       - name: Install build and packaging tools
         run: |
@@ -274,12 +277,12 @@ jobs:
       PDFCRAFT_BUILD_DATE: ${{ needs.version.outputs.date }}
     steps:
       - uses: actions/checkout@v4
-      # The craft-fonts build input (Japanese fonts): every release embeds it. Bump deliberately.
+      # The craft-fonts build input (interface scripts): every release embeds it. Bump deliberately.
       - name: Check out craft-fonts
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          repository: storytold/craft-fonts
-          ref: 8dcdacd5153e64560d109541a47d806f26f048c0
+          repository: lukashold/craft-fonts
+          ref: 9e89a056b92666d14ba70cd1c0811d9cfb6777fe
           path: craft-fonts
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -396,12 +399,13 @@ jobs:
       VERSION_OVERRIDE: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
-      # The craft-fonts build input (Japanese fonts): every release embeds it. Bump deliberately.
+      # The craft-fonts build input (Japanese, Chinese, Arabic/Urdu, Indic and Korean fonts): every release embeds it.
+      # Bump deliberately; the faces it must have are asserted by the crates/fonts and ui-egui tests.
       - name: Check out craft-fonts
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          repository: storytold/craft-fonts
-          ref: 8dcdacd5153e64560d109541a47d806f26f048c0
+          repository: lukashold/craft-fonts
+          ref: 9e89a056b92666d14ba70cd1c0811d9cfb6777fe
           path: craft-fonts
       - name: Build and package in a FreeBSD VM (tar.gz)
         # vmactions/freebsd-vm v1.5.9, pinned by commit (it runs our build).
@@ -442,12 +446,13 @@ jobs:
       TRUNK_VERSION: 0.21.14
     steps:
       - uses: actions/checkout@v4
-      # The craft-fonts build input (Japanese fonts): every release embeds it. Bump deliberately.
+      # The craft-fonts build input (Japanese, Chinese, Arabic/Urdu, Indic and Korean fonts): every release embeds it.
+      # Bump deliberately; the faces it must have are asserted by the crates/fonts and ui-egui tests.
       - name: Check out craft-fonts
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          repository: storytold/craft-fonts
-          ref: 8dcdacd5153e64560d109541a47d806f26f048c0
+          repository: lukashold/craft-fonts
+          ref: 9e89a056b92666d14ba70cd1c0811d9cfb6777fe
           path: craft-fonts
       - uses: dtolnay/rust-toolchain@stable
         with:

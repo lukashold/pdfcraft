@@ -56,7 +56,7 @@ const AR_DAYS: [&str; 7] = ["الأحد", "الاثنين", "الثلاثاء", 
 
 /// The languages month and weekday names can be written in (Preferences ▸ Date format ▸ Language):
 /// the interface languages, in the same order and with the same names.
-pub const DATE_LANGUAGES: [DateLanguage; 17] = [
+pub static DATE_LANGUAGES: [DateLanguage; 23] = [
     DateLanguage {
         code: "en",
         name: "English",
@@ -262,6 +262,60 @@ pub const DATE_LANGUAGES: [DateLanguage; 17] = [
         months_short: ["sty", "lut", "mar", "kwi", "maj", "cze", "lip", "sie", "wrz", "paź", "lis", "gru"],
         days: ["niedziela", "poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota"],
         days_short: ["niedz.", "pon.", "wt.", "śr.", "czw.", "pt.", "sob."],
+    },
+    DateLanguage {
+        code: "tr",
+        name: "Türkçe",
+        months: ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"],
+        months_with_day: None,
+        months_short: ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"],
+        days: ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"],
+        days_short: ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"],
+    },
+    DateLanguage {
+        code: "id",
+        name: "Bahasa Indonesia",
+        months: ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"],
+        months_with_day: None,
+        months_short: ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"],
+        days: ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"],
+        days_short: ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"],
+    },
+    DateLanguage {
+        code: "ko",
+        name: "한국어",
+        months: ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"],
+        months_with_day: None,
+        months_short: ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"],
+        days: ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"],
+        days_short: ["일", "월", "화", "수", "목", "금", "토"],
+    },
+    DateLanguage {
+        code: "hi",
+        name: "हिन्दी",
+        months: ["जनवरी", "फ़रवरी", "मार्च", "अप्रैल", "मई", "जून", "जुलाई", "अगस्त", "सितंबर", "अक्टूबर", "नवंबर", "दिसंबर"],
+        months_short: ["जन॰", "फ़र॰", "मार्च", "अप्रै॰", "मई", "जून", "जुल॰", "अग॰", "सित॰", "अक्टू॰", "नव॰", "दिस॰"],
+        days: ["रविवार", "सोमवार", "मंगलवार", "बुधवार", "गुरुवार", "शुक्रवार", "शनिवार"],
+        days_short: ["रवि", "सोम", "मंगल", "बुध", "गुरु", "शुक्र", "शनि"],
+        months_with_day: None,
+    },
+    DateLanguage {
+        code: "bn",
+        name: "বাংলা",
+        months: ["জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর"],
+        months_short: ["জানু", "ফেব", "মার্চ", "এপ্রি", "মে", "জুন", "জুলা", "আগ", "সেপ্টে", "অক্টো", "নভে", "ডিসে"],
+        days: ["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার", "শুক্রবার", "শনিবার"],
+        days_short: ["রবি", "সোম", "মঙ্গল", "বুধ", "বৃহস্পতি", "শুক্র", "শনি"],
+        months_with_day: None,
+    },
+    DateLanguage {
+        code: "ur",
+        name: "اردو",
+        months: ["جنوری", "فروری", "مارچ", "اپریل", "مئی", "جون", "جولائی", "اگست", "ستمبر", "اکتوبر", "نومبر", "دسمبر"],
+        months_short: ["جنوری", "فروری", "مارچ", "اپریل", "مئی", "جون", "جولائی", "اگست", "ستمبر", "اکتوبر", "نومبر", "دسمبر"],
+        days: ["اتوار", "پیر", "منگل", "بدھ", "جمعرات", "جمعہ", "ہفتہ"],
+        days_short: ["اتوار", "پیر", "منگل", "بدھ", "جمعرات", "جمعہ", "ہفتہ"],
+        months_with_day: None,
     },
 ];
 
@@ -538,6 +592,11 @@ mod tests {
     fn names_follow_the_date_language() {
         assert_eq!(in_lang("dddd, d \\de mmmm \\de yyyy", "es"), "sábado, 7 de marzo de 2026");
         assert_eq!(in_lang("ddd d mmm", "pt-br"), "sáb 7 mar");
+        assert_eq!(in_lang("dddd d mmmm yyyy", "hi"), "शनिवार 7 मार्च 2026");
+        assert_eq!(in_lang("dddd d mmmm yyyy", "bn"), "শনিবার 7 মার্চ 2026");
+        assert_eq!(in_lang("dddd d mmmm yyyy", "ur"), "ہفتہ 7 مارچ 2026");
+        assert_eq!(in_lang("dddd d mmmm yyyy", "id"), "Sabtu 7 Maret 2026");
+        assert_eq!(in_lang("dddd d mmmm yyyy", "ko"), "토요일 7 3월 2026");
         assert_eq!(in_lang("dddd d mmmm yyyy", "fr"), "samedi 7 mars 2026");
         assert_eq!(in_lang("dddd d mmmm yyyy", "it"), "sabato 7 marzo 2026");
         assert_eq!(in_lang("ddd d mmm", "it"), "sab 7 mar");

@@ -41,7 +41,7 @@ env:
   CARGO_INCREMENTAL: 0
   RUST_BACKTRACE: 1
   PDFCRAFT_BUILD_SHA: ${{ github.sha }}
-  PDFCRAFT_VERSION: 0.6.0-preview.20261011.7
+  PDFCRAFT_VERSION: 0.6.0-preview.20261011.8
   PDFCRAFT_SYSTEM_FONTS: '0'
 
 jobs:
@@ -88,11 +88,11 @@ jobs:
           - { arch: arm64, target: aarch64-pc-windows-msvc }
     steps:
       - uses: actions/checkout@v4
-      - name: Check out approved Japanese fonts
+      - name: Check out approved interface fonts
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          repository: storytold/craft-fonts
-          ref: 8dcdacd5153e64560d109541a47d806f26f048c0
+          repository: lukashold/craft-fonts
+          ref: 9e89a056b92666d14ba70cd1c0811d9cfb6777fe
           path: craft-fonts
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -137,11 +137,11 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
-      - name: Check out approved Japanese fonts
+      - name: Check out approved interface fonts
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          repository: storytold/craft-fonts
-          ref: 8dcdacd5153e64560d109541a47d806f26f048c0
+          repository: lukashold/craft-fonts
+          ref: 9e89a056b92666d14ba70cd1c0811d9cfb6777fe
           path: craft-fonts
       - uses: dtolnay/rust-toolchain@stable
         with:

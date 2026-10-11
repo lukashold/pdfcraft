@@ -10,7 +10,7 @@ pub fn install_fonts(ctx: &egui::Context) {
         .font_data
         .insert("Inter".into(), std::sync::Arc::new(egui::FontData::from_static(include_bytes!("../../../assets/fonts/Inter-Regular.ttf"))));
     fonts.families.entry(egui::FontFamily::Proportional).or_default().insert(0, "Inter".into());
-    for face in pdfcraft_fonts::ui_cjk_fonts(false) {
+    for face in pdfcraft_fonts::ui_cjk_fonts(pdfcraft_fonts::CjkPreference::Japanese) {
         let name = face.name();
         fonts.font_data.insert(name.clone(), std::sync::Arc::new(egui::FontData::from_static(face.bytes)));
         fonts.families.entry(egui::FontFamily::Proportional).or_default().push(name);

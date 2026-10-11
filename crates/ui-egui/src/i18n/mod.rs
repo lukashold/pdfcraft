@@ -24,6 +24,8 @@
 //!   translators may reorder placeholders freely.
 
 mod catalog;
+#[cfg(test)]
+mod world_tests;
 
 use std::cell::Cell;
 use std::sync::OnceLock;
@@ -67,7 +69,7 @@ fn plural_cs(n: u64) -> usize {
     }
 }
 
-/// Portuguese: 0 and 1 take the singular, everything else the plural.
+/// Portuguese, Hindi and Bengali integer counts: 0 and 1 take the singular, everything else the plural.
 fn plural_pt(n: u64) -> usize {
     usize::from(n > 1)
 }
@@ -126,7 +128,7 @@ fn plural_polish(n: u64) -> usize {
 }
 
 /// The registry. English first: it is the fallback and the source language.
-pub static LANGUAGES: [LangInfo; 17] = [
+pub static LANGUAGES: [LangInfo; 23] = [
     LangInfo { code: "en", name: "English", source: "", plural: plural_one_other, rtl: false, catalog: OnceLock::new() },
     LangInfo { code: "ja", name: "日本語", source: include_str!("ja.tsv"), plural: plural_none, rtl: false, catalog: OnceLock::new() },
     // Simplified Chinese; `zh`, `zh-CN`, `zh-SG` and `zh-Hans-*` locales resolve here (see `candidates`).
@@ -177,6 +179,13 @@ pub static LANGUAGES: [LangInfo; 17] = [
     LangInfo { code: "ar", name: "العربية", source: include_str!("ar.tsv"), plural: plural_arabic, rtl: true, catalog: OnceLock::new() },
     // Polish; every `pl-*` locale (`pl-pl`, `pl_pl.UTF-8`) resolves here.
     LangInfo { code: "pl", name: "Polski", source: include_str!("pl.tsv"), plural: plural_polish, rtl: false, catalog: OnceLock::new() },
+    // Turkish; every `tr-*` locale (`tr-TR`, `tr_TR.UTF-8`) resolves here.
+    LangInfo { code: "tr", name: "Türkçe", source: include_str!("tr.tsv"), plural: plural_none, rtl: false, catalog: OnceLock::new() },
+    LangInfo { code: "id", name: "Bahasa Indonesia", source: include_str!("id.tsv"), plural: plural_none, rtl: false, catalog: OnceLock::new() },
+    LangInfo { code: "ko", name: "한국어", source: include_str!("ko.tsv"), plural: plural_none, rtl: false, catalog: OnceLock::new() },
+    LangInfo { code: "hi", name: "हिन्दी", source: include_str!("hi.tsv"), plural: plural_pt, rtl: false, catalog: OnceLock::new() },
+    LangInfo { code: "bn", name: "বাংলা", source: include_str!("bn.tsv"), plural: plural_pt, rtl: false, catalog: OnceLock::new() },
+    LangInfo { code: "ur", name: "اردو", source: include_str!("ur.tsv"), plural: plural_one_other, rtl: true, catalog: OnceLock::new() },
 ];
 
 impl LangInfo {
@@ -244,6 +253,16 @@ impl Lang {
         self.0.name
     }
 
+    /// Which CJK faces the interface puts first in this language: the Simplified or Traditional
+    /// Chinese ones in those languages, the Japanese ones in every other language.
+    pub fn cjk_preference(self) -> pdfcraft_fonts::CjkPreference {
+        match self.0.code {
+            "zh-hans" => pdfcraft_fonts::CjkPreference::Simplified,
+            "zh-hant" => pdfcraft_fonts::CjkPreference::Traditional,
+            _ => pdfcraft_fonts::CjkPreference::Japanese,
+        }
+    }
+
     /// Whether the language is written right to left. Its translations come back from the
     /// lookups in display order (see [`LangInfo::rtl`]).
     pub fn rtl(self) -> bool {
@@ -267,7 +286,7 @@ pub fn normalize_pref(pref: &str) -> Option<&'static str> {
 /// Candidate language codes for a locale tag, most specific first: `zh_TW.UTF-8` →
 /// `zh-tw`, `zh-hant`, `zh`.
 fn candidates(tag: &str) -> Vec<String> {
-    let base = tag.split(['.', '@']).next().unwrap_or("").replace('_', "-").to_ascii_lowercase();
+    let base = tag.trim().split(['.', '@']).next().unwrap_or("").replace('_', "-").to_ascii_lowercase();
     let parts: Vec<&str> = base.split('-').filter(|p| !p.is_empty()).collect();
     let Some(&primary) = parts.first() else { return Vec::new() };
     let mut out = Vec::new();
@@ -308,58 +327,33 @@ pub fn system_lang() -> Lang {
     *SYSTEM.get_or_init(detect_system_lang)
 }
 
+/// Resolve only the primary locale. An unsupported primary language falls back to English,
+/// even when a later language in the system preference list is supported. The same resolver
+/// is used by native apps and browser/mobile webviews.
+pub fn primary_language<'a>(mut locales: impl Iterator<Item = &'a str>) -> Lang {
+    locales.next().and_then(lang_from_tag).unwrap_or(Lang::EN)
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 fn detect_system_lang() -> Lang {
-    for var in ["LC_ALL", "LC_MESSAGES", "LANG"] {
-        if let Some(l) = std::env::var(var).ok().and_then(|v| language_override(&v)) {
-            return l;
-        }
-    }
-    // Apps started from the Finder don't inherit LANG: use the macOS preferred-languages list.
-    // The absolute path keeps a `defaults` earlier on PATH from running; any failure means English.
-    #[cfg(target_os = "macos")]
-    if let Ok(out) = std::process::Command::new("/usr/bin/defaults").args(["read", "-g", "AppleLanguages"]).output()
-        && out.status.success()
-        && let Some(l) = first_supported(&String::from_utf8_lossy(&out.stdout))
-    {
-        return l;
-    }
-    #[cfg(target_os = "windows")]
-    if let Some(l) = windows_ui_language().as_deref().and_then(first_supported) {
-        return l;
-    }
-    Lang::EN
-}
-
-/// A named locale can override the display language. On Windows, the neutral
-/// C/POSIX locale inherited from a launcher says nothing about the user's UI language.
-#[cfg(not(target_arch = "wasm32"))]
-fn language_override(tag: &str) -> Option<Lang> {
-    let tag = tag.trim();
-    if cfg!(target_os = "windows") && matches!(candidates(tag).first().map(String::as_str), Some("c" | "posix")) {
-        return None;
-    }
-    lang_from_tag(tag)
-}
-
-/// The Windows display languages in preference order, one tag per line, queried once when Auto
-/// first resolves. `sys-locale` asks Windows directly (`GetUserPreferredUILanguages`), so no
-/// process is started.
-#[cfg(target_os = "windows")]
-fn windows_ui_language() -> Option<String> {
-    let tags: Vec<String> = sys_locale::get_locales().collect();
-    (!tags.is_empty()).then(|| tags.join("\n"))
-}
-
-/// The first supported language in a macOS `defaults read` list or Windows UI-culture output.
-#[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
-fn first_supported(list: &str) -> Option<Lang> {
-    list.split(['(', ')', ',', '"', '\n']).map(str::trim).filter(|s| !s.is_empty()).find_map(lang_from_tag)
+    // OS display-language API on Windows/Apple, locale settings on Unix. Only the first
+    // preference is considered; no subprocess or secondary-language scan.
+    let primary = sys_locale::get_locale();
+    primary_language(primary.as_deref().into_iter())
 }
 
 #[cfg(target_arch = "wasm32")]
 fn detect_system_lang() -> Lang {
-    Lang::EN
+    // Mobile's webview uses the same browser API. No window/locale means English,
+    // including workers or a browser that withholds language information.
+    let primary = web_sys::window().and_then(|window| window.navigator().languages().get(0).as_string());
+    primary_language(primary.as_deref().into_iter())
+}
+
+#[cfg(test)]
+fn test_primary_list(list: &str) -> Option<Lang> {
+    let primary = list.split(['(', ')', ',', '"', '\n']).map(str::trim).find(|s| !s.is_empty())?;
+    Some(primary_language(std::iter::once(primary)))
 }
 
 thread_local! {
@@ -554,49 +548,33 @@ mod tests {
 
     #[test]
     fn macos_language_list_is_parsed() {
-        assert_eq!(first_supported("(\n    \"ja-JP\",\n    \"en-US\"\n)\n"), Some(JA()));
-        assert_eq!(first_supported("(\n    \"fr-FR\",\n    \"en-US\"\n)\n"), Lang::from_code("fr"));
-        assert_eq!(first_supported("("), None);
+        assert_eq!(test_primary_list("(\n    \"ja-JP\",\n    \"en-US\"\n)\n"), Some(JA()));
+        assert_eq!(test_primary_list("(\n    \"fr-FR\",\n    \"en-US\"\n)\n"), Lang::from_code("fr"));
+        assert_eq!(test_primary_list("("), None);
     }
 
     #[test]
     fn windows_display_language_resolves_chinese_scripts() {
         for tag in ["zh-CN", "zh-SG", "zh-Hans", "zh-Hans-CN"] {
-            assert_eq!(first_supported(&format!("{tag}\r\n")), Lang::from_code("zh-hans"));
+            assert_eq!(test_primary_list(&format!("{tag}\r\n")), Lang::from_code("zh-hans"));
         }
         for tag in ["zh-TW", "zh-HK", "zh-MO", "zh-Hant", "zh-Hant-HK"] {
-            assert_eq!(first_supported(&format!("{tag}\r\n")), Lang::from_code("zh-hant"));
+            assert_eq!(test_primary_list(&format!("{tag}\r\n")), Lang::from_code("zh-hant"));
         }
-        assert_eq!(first_supported("en-US\r\n"), Some(Lang::EN));
-        assert_eq!(first_supported("fr-FR\r\n"), Lang::from_code("fr"));
-        assert_eq!(first_supported("\r\n"), None);
+        assert_eq!(test_primary_list("en-US\r\n"), Some(Lang::EN));
+        assert_eq!(test_primary_list("fr-FR\r\n"), Lang::from_code("fr"));
+        assert_eq!(test_primary_list("\r\n"), None);
     }
 
-    #[cfg(target_os = "windows")]
     #[test]
-    fn neutral_locale_does_not_override_display_language() {
-        let fr = Lang::from_code("fr").unwrap();
-        for tag in ["C", "C.UTF-8", "POSIX", "posix.UTF-8", "", "  C.UTF-8  ", "unsupported"] {
-            assert_eq!(language_override(tag), None, "{tag}");
-            assert_eq!(language_override(tag).or_else(|| first_supported("unsupported-XY\nfr-FR\nen-US")), Some(fr));
+    fn auto_uses_the_primary_language_or_english_only() {
+        for tags in [vec!["unsupported-XY", "fr-FR"], vec!["", "de-AT"], vec!["sv-SE", "ja-JP"], vec![]] {
+            assert_eq!(primary_language(tags.into_iter()), Lang::EN);
         }
-        assert_eq!(["C.UTF-8", "POSIX", "fr_FR.UTF-8"].into_iter().find_map(language_override), Some(fr));
-        assert_eq!(language_override("fr_FR.UTF-8"), Some(fr));
-        assert_eq!(language_override("en_US.UTF-8"), Some(Lang::EN));
-        assert_eq!(language_override("ja_JP.UTF-8"), Some(JA()));
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn windows_display_language_query_returns_a_locale_tag() {
-        // One tag per line, as `first_supported` reads them: a machine with several display
-        // languages reports them all, so each line is checked rather than the list as a whole.
-        let list = windows_ui_language().expect("Windows should report a display language");
-        let tags: Vec<&str> = list.lines().map(str::trim).filter(|t| !t.is_empty()).collect();
-        assert!(!tags.is_empty(), "no display language in {list:?}");
-        for tag in tags {
-            assert!(tag.split('-').all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_alphanumeric())), "not a locale tag: {tag:?}");
-        }
+        assert_eq!(primary_language(["de-AT", "fr-FR"].into_iter()), Lang::from_code("de").unwrap());
+        assert_eq!(primary_language(["fr-CA", "de-DE"].into_iter()), Lang::from_code("fr").unwrap());
+        assert_eq!(primary_language(["en-US", "ja-JP"].into_iter()), Lang::EN);
+        assert_eq!(primary_language(["C.UTF-8", "de-DE"].into_iter()), Lang::EN);
     }
 
     #[test]
@@ -799,14 +777,14 @@ mod tests {
             labels.insert(label.to_string());
         }
         assert!(labels.len() > 20 && labels.contains("Comb of characters"), "the scan found the dialog's labels: {labels:?}");
-        for code in ["bg", "de", "es", "fr", "hu", "it", "ja", "pt-br", "ru", "te", "uk", "zh-hans", "zh-hant"] {
+        for code in ["bg", "de", "es", "fr", "hu", "it", "ja", "pt-br", "ru", "te", "tr", "uk", "zh-hans", "zh-hant"] {
             let lang = Lang::from_code(code).expect("registered");
             let missing: Vec<_> = labels.iter().filter(|l| !has(lang, l)).collect();
             assert!(missing.is_empty(), "{code} lacks Shared Field Properties labels: {missing:#?}");
         }
     }
 
-    fn ui_literals() -> std::collections::BTreeSet<String> {
+    pub(super) fn ui_literals() -> std::collections::BTreeSet<String> {
         let mut stack = vec![std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src")];
         let mut literals = std::collections::BTreeSet::new();
         while let Some(dir) = stack.pop() {
@@ -906,6 +884,78 @@ mod tests {
             let mut fonts = Fonts::new(TextOptions::default(), defs);
             for id in [egui::FontId::proportional(13.0), egui::FontId::monospace(13.0), crate::theme::medium(13.0), crate::theme::semibold(17.0)] {
                 assert!(fonts.has_glyphs(&id, &labels), "{build}: {id:?} lacks a Japanese label glyph");
+            }
+        }
+    }
+
+    /// Each Chinese interface language puts its own script's faces first; every other language,
+    /// Japanese and the Chinese-locale fallbacks of `Auto` included, keeps the Japanese order.
+    #[test]
+    fn chinese_languages_prefer_their_own_faces() {
+        use pdfcraft_fonts::CjkPreference;
+        assert_eq!(Lang::from_code("zh-hans").map(Lang::cjk_preference), Some(CjkPreference::Simplified));
+        assert_eq!(Lang::from_code("zh-hant").map(Lang::cjk_preference), Some(CjkPreference::Traditional));
+        assert_eq!(lang_from_tag("zh-TW").map(Lang::cjk_preference), Some(CjkPreference::Traditional));
+        assert_eq!(lang_from_tag("zh_CN.UTF-8").map(Lang::cjk_preference), Some(CjkPreference::Simplified));
+        for code in ["en", "ja", "ar", "te", "fr"] {
+            assert_eq!(Lang::from_code(code).map(Lang::cjk_preference), Some(CjkPreference::Japanese), "{code}");
+        }
+    }
+
+    /// With craft-fonts, every Simplified and Traditional Chinese translation has glyphs, with all
+    /// interface faces (desktop) and with the faces the web build keeps; and every character the
+    /// app's own faces lack comes from the language's Chinese face, so none falls through to a
+    /// Japanese face (Japanese glyph shapes, another baseline) or shows as tofu (#499). A build
+    /// with craft-fonts but no allowed Chinese face fails here instead of skipping.
+    #[test]
+    fn chinese_labels_have_glyphs() {
+        use egui::epaint::text::{Fonts, TextOptions};
+        use skrifa::MetadataProvider as _;
+        if pdfcraft_fonts::CRAFT_FONTS.is_empty() {
+            eprintln!("skipping Chinese glyph checks: build with CRAFT_FONTS_DIR to run them");
+            return;
+        }
+        for code in ["zh-hans", "zh-hant"] {
+            let lang = Lang::from_code(code).expect("registered");
+            let cjk = lang.cjk_preference();
+            let faces =
+                if code == "zh-hans" { pdfcraft_fonts::ui_simplified_chinese_fonts() } else { pdfcraft_fonts::ui_traditional_chinese_fonts() };
+            let Some(chinese) = faces.first() else { panic!("{code}: craft-fonts has no allowed {} face", cjk.script()) };
+            let (entries, errors) = parse_entries(lang.0.source, lang.0.plural_forms());
+            assert!(errors.is_empty(), "{code}: {errors:?}");
+            let labels: Vec<char> =
+                entries.iter().flat_map(|e| e.translation.chars()).chain(lang.name().chars()).filter(|c| !c.is_control()).collect();
+
+            let desktop = crate::theme::font_definitions_for(cjk);
+            let own: Vec<skrifa::FontRef> = ["Inter", "Inter-Medium", "Inter-SemiBold", "JetBrainsMono"]
+                .iter()
+                .map(|name| {
+                    let data = &desktop.font_data[*name];
+                    skrifa::FontRef::from_index(&data.font, data.index).expect("bundled font parses")
+                })
+                .collect();
+            let face = skrifa::FontRef::new(chinese.bytes).expect("craft-fonts face parses");
+            let mut not_chinese: Vec<char> = labels
+                .iter()
+                .copied()
+                .filter(|c| !c.is_whitespace() && own.iter().all(|f| f.charmap().map(*c).is_none()) && face.charmap().map(*c).is_none())
+                .collect();
+            not_chinese.sort_unstable();
+            not_chinese.dedup();
+            assert!(not_chinese.is_empty(), "{code}: {} lacks {not_chinese:?}", chinese.name());
+
+            let mut web = crate::theme::font_definitions_for(cjk);
+            for family in web.families.values_mut() {
+                family.retain(|name| pdfcraft_fonts::CRAFT_FONTS.iter().find(|f| f.name() == *name).is_none_or(|f| f.on_web()));
+            }
+            for (build, defs) in [("desktop", desktop), ("web", web)] {
+                let mut fonts = Fonts::new(TextOptions::default(), defs);
+                for id in [egui::FontId::proportional(13.0), egui::FontId::monospace(13.0), crate::theme::medium(13.0), crate::theme::semibold(17.0)]
+                {
+                    let missing: std::collections::BTreeSet<char> =
+                        labels.iter().copied().filter(|c| !fonts.has_glyphs(&id, &c.to_string())).collect();
+                    assert!(missing.is_empty(), "{code} {build}: {id:?} lacks label glyphs {missing:?}");
+                }
             }
         }
     }
@@ -1063,7 +1113,7 @@ mod tests {
         assert_eq!(normalize_pref("ES"), Some("es"));
         assert_eq!(lang_from_tag("es_ES.UTF-8"), Some(es));
         assert_eq!(lang_from_tag("es-MX"), Some(es));
-        assert_eq!(first_supported("es-ES\r\nen-US"), Some(es));
+        assert_eq!(test_primary_list("es-ES\r\nen-US"), Some(es));
         assert_eq!(tr(es, "File"), "Archivo");
         assert_eq!(tr(es, "Save as…"), "Guardar como…");
         assert_eq!(tr(es, "Informe del usuario.pdf"), "Informe del usuario.pdf");
@@ -1101,7 +1151,7 @@ mod tests {
         assert_eq!(te.name(), "తెలుగు");
         assert_eq!(normalize_pref("TE"), Some("te"));
         assert_eq!(lang_from_tag("te_IN.UTF-8"), Some(te));
-        assert_eq!(first_supported("te-IN\r\nen-US"), Some(te));
+        assert_eq!(test_primary_list("te-IN\r\nen-US"), Some(te));
         assert_eq!(tr(te, "File"), "ఫైల్");
         assert_eq!(tr(te, "Save as…"), "వేరే పేరుతో సేవ్ చేయి…");
         assert_eq!(tr(te, "నివేదిక.pdf"), "నివేదిక.pdf");
@@ -1215,6 +1265,97 @@ mod tests {
         let mut restored = crate::PdfCraftApp::default();
         restored.restore(&app.persist());
         assert_eq!(restored.language, "cs");
+    }
+
+    /// Turkish covers every registered menu title and menu command label, keeps ellipses, and
+    /// persists in preferences.
+    #[test]
+    fn turkish_covers_every_menu_label() {
+        let tr_lang = Lang::from_code("tr").expect("tr registered");
+        assert_eq!(tr_lang.name(), "Türkçe");
+        assert_eq!(tr(tr_lang, "File"), "Dosya");
+        assert_eq!(tr(tr_lang, "Türkçe Belge.pdf"), "Türkçe Belge.pdf");
+        assert_eq!((0..=6).map(|n| (tr_lang.0.plural)(n)).collect::<Vec<_>>(), [0; 7]);
+        for spec in pdfcraft_engine::commands::COMMANDS {
+            let Some(menu) = spec.menu else { continue };
+            assert!(has(tr_lang, menu), "Turkish lacks the menu title {menu:?}");
+            assert!(has(tr_lang, spec.label), "Turkish lacks the {menu} menu label {:?} ({})", spec.label, spec.id);
+        }
+        const KEEP_AS_IS: &[&str] = &[
+            "OK",
+            "PDF/A…",
+            "Microsoft Word (.docx)",
+            "PostScript / EPS",
+            "Preflight",
+            "JavaScript",
+            "ZIP",
+            "{n} {kind}",
+            "{rule} - {status}",
+            "Poster",
+            "{field}: {e}",
+            "`{command}` {when}",
+            "{0}: {1}",
+            "{month} {y}",
+            "+LOC",
+            "−LOC",
+            "ΔLOC",
+            "+Bin",
+            "−Bin",
+            "Model",
+            "Home / End",
+        ];
+        let (entries, errors) = parse_entries(tr_lang.0.source, tr_lang.0.plural_forms());
+        assert!(errors.is_empty(), "Turkish catalog errors: {errors:?}");
+        for e in &entries {
+            assert!(
+                e.source != e.translation
+                    || KEEP_AS_IS.contains(&e.source.as_str())
+                    || (e.context == "key" && KEY_CAP_NAMES.contains(&e.source.as_str())),
+                "{:?} is untranslated",
+                e.source
+            );
+            assert!(!e.translation.contains("..."), "use … rather than three dots: {:?}", e.translation);
+            assert_eq!(e.source.starts_with(' '), e.translation.starts_with(' '), "leading space mismatch: {:?}", e.translation);
+            assert_eq!(e.source.ends_with(' '), e.translation.ends_with(' '), "trailing space mismatch: {:?}", e.translation);
+        }
+        let mut app = crate::PdfCraftApp::default();
+        app.set_option("language", "tr").unwrap();
+        assert!(app.set_option("language", "tu").is_err());
+        assert_eq!(app.language, "tr");
+        let mut restored = crate::PdfCraftApp::default();
+        restored.restore(&app.persist());
+        assert_eq!(restored.language, "tr");
+    }
+
+    /// Turkish translates every registered command, menu and All tools label.
+    #[test]
+    fn turkish_covers_commands_and_catalogue() {
+        let tr_lang = Lang::from_code("tr").expect("tr registered");
+        for command in pdfcraft_engine::commands::COMMANDS {
+            assert!(has(tr_lang, command.label), "missing command: {}", command.label);
+            if let Some(menu) = command.menu {
+                assert!(has(tr_lang, menu), "missing menu: {menu}");
+            }
+        }
+        for group in pdfcraft_engine::catalog::TOOL_GROUPS {
+            assert!(has(tr_lang, group.label), "missing group: {}", group.label);
+            for section in group.sections {
+                assert!(has(tr_lang, section.title), "missing section: {}", section.title);
+                for item in section.items {
+                    assert!(has(tr_lang, item.label), "missing item: {}", item.label);
+                }
+            }
+        }
+    }
+
+    /// Turkish translates every `tl!("…")` literal in the UI source.
+    #[test]
+    fn turkish_covers_ui_literals() {
+        let literals = ui_literals();
+        assert!(literals.len() > 900, "source scan found only {} literals", literals.len());
+        let tr_lang = Lang::from_code("tr").expect("tr registered");
+        let missing: Vec<_> = literals.iter().filter(|label| !has(tr_lang, label)).collect();
+        assert!(missing.is_empty(), "untranslated Turkish UI literals: {missing:#?}");
     }
 
     #[test]
@@ -1376,7 +1517,7 @@ mod tests {
         assert_eq!(normalize_pref("FR"), Some("fr"));
         assert_eq!(lang_from_tag("fr_FR.UTF-8"), Some(fr));
         assert_eq!(lang_from_tag("fr-CA"), Some(fr));
-        assert_eq!(first_supported("fr-FR\r\nen-US"), Some(fr));
+        assert_eq!(test_primary_list("fr-FR\r\nen-US"), Some(fr));
         assert_eq!(tr(fr, "File"), "Fichier");
         assert_eq!(tr(fr, "Save as…"), "Enregistrer sous…");
         assert_eq!(tr(fr, "Bookmarks"), "Signets");
@@ -1482,7 +1623,7 @@ mod tests {
         assert_eq!(lang_from_tag("de_DE.UTF-8"), Some(de));
         assert_eq!(lang_from_tag("de-AT"), Some(de));
         assert_eq!(lang_from_tag("de_CH"), Some(de));
-        assert_eq!(first_supported("de-DE\r\nen-US"), Some(de));
+        assert_eq!(test_primary_list("de-DE\r\nen-US"), Some(de));
         assert_eq!(tr(de, "File"), "Datei");
         assert_eq!(tr(de, "Save as…"), "Speichern unter…");
         assert_eq!(tr(de, "Bookmarks"), "Lesezeichen");
@@ -1608,7 +1749,7 @@ mod tests {
         assert_eq!(normalize_pref("RU"), Some("ru"));
         assert_eq!(lang_from_tag("ru_RU.UTF-8"), Some(ru));
         assert_eq!(lang_from_tag("ru-BY"), Some(ru));
-        assert_eq!(first_supported("ru-RU\r\nen-US"), Some(ru));
+        assert_eq!(test_primary_list("ru-RU\r\nen-US"), Some(ru));
         assert_eq!(tr(ru, "File"), "Файл");
         assert_eq!(tr(ru, "Save as…"), "Сохранить как…");
         assert_eq!(tr(ru, "Bookmarks"), "Закладки");
@@ -1719,7 +1860,7 @@ mod tests {
         assert_eq!(normalize_pref("BG"), Some("bg"));
         assert_eq!(lang_from_tag("bg_BG.UTF-8"), Some(bg));
         assert_eq!(lang_from_tag("bg-BG"), Some(bg));
-        assert_eq!(first_supported("bg-BG\r\nen-US"), Some(bg));
+        assert_eq!(test_primary_list("bg-BG\r\nen-US"), Some(bg));
         assert_eq!(tr(bg, "File"), "Файл");
         assert_eq!(tr(bg, "Save as…"), "Запиши като…");
         assert_eq!(tr(bg, "Bookmarks"), "Отметки");
@@ -1822,7 +1963,7 @@ mod tests {
         assert_eq!(normalize_pref("HU"), Some("hu"));
         assert_eq!(lang_from_tag("hu_HU.UTF-8"), Some(hu));
         assert_eq!(lang_from_tag("hu-HU"), Some(hu));
-        assert_eq!(first_supported("hu-HU\r\nen-US"), Some(hu));
+        assert_eq!(test_primary_list("hu-HU\r\nen-US"), Some(hu));
         assert_eq!(tr(hu, "File"), "Fájl");
         assert_eq!(tr(hu, "Save as…"), "Mentés másként…");
         assert_eq!(tr(hu, "Bookmarks"), "Könyvjelzők");
@@ -1938,8 +2079,8 @@ mod tests {
         for tag in ["uk", "uk-UA", "uk_UA.UTF-8", "UK-ua", "uk_UA@variant"] {
             assert_eq!(lang_from_tag(tag), Some(uk), "{tag}");
         }
-        assert_eq!(first_supported("uk-UA\r\nen-US"), Some(uk));
-        assert_eq!(first_supported("(\n    \"uk-UA\",\n    \"en-US\"\n)\n"), Some(uk));
+        assert_eq!(test_primary_list("uk-UA\r\nen-US"), Some(uk));
+        assert_eq!(test_primary_list("(\n    \"uk-UA\",\n    \"en-US\"\n)\n"), Some(uk));
         assert_eq!(tr(uk, "File"), "Файл");
         assert_eq!(tr(uk, "Save as…"), "Зберегти як…");
         assert_eq!(tr(uk, "Bookmarks"), "Закладки");
@@ -2153,12 +2294,12 @@ mod tests {
         let ar = arabic();
         assert_eq!(ar.name(), "العربية");
         assert!(ar.rtl());
-        assert!(Lang::all().filter(|l| l.rtl()).eq([ar]), "Arabic is the only right-to-left language");
+        assert!(Lang::all().filter(|l| l.rtl()).eq([ar, Lang::from_code("ur").unwrap()]), "Arabic and Urdu use right-to-left display");
         assert_eq!(normalize_pref("AR"), Some("ar"));
         for tag in ["ar", "ar-MA", "ar_EG.UTF-8", "AR-sa", "ar_DZ@variant"] {
             assert_eq!(lang_from_tag(tag), Some(ar), "{tag}");
         }
-        assert_eq!(first_supported("ar-MA\r\nen-US"), Some(ar));
+        assert_eq!(test_primary_list("ar-MA\r\nen-US"), Some(ar));
         assert_eq!(tr(ar, "File"), "ملف");
         assert_eq!(tr(ar, "Bookmarks"), "المرجعية الإشارات");
         assert_eq!(tr_ctx(ar, "comment menu", "Edit"), "تحرير");
