@@ -2947,7 +2947,7 @@ fn ocr_tools_make_a_scan_searchable() {
     let mut a = auto(&dir);
     let status = ok(&mut a, "ocr_status", json!({}));
     assert_eq!(status["languages"][0]["code"], "en");
-    for language in ["de", "ja", "fr", "es", "it"] {
+    for language in ["de", "ja", "fr", "es", "it", "nl", "da", "nb", "sv", "fi", "pt"] {
         assert!(status["languages"].as_array().unwrap().iter().any(|l| l["code"] == language));
     }
     for name in ["ocr_recognize", "ocr_recognize_files"] {

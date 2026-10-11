@@ -27,8 +27,29 @@ pub const DICTIONARY: &str = "multilingual-dictionary.txt";
 pub const ALPHABET: &str = " 0123456789!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~€ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
 /// Supported and tested language choices (ISO 639-1).
-pub const LANGUAGES: &[(&str, &str)] =
-    &[("en", "English"), ("de", "Deutsch"), ("ja", "日本語"), ("fr", "Français"), ("es", "Español"), ("it", "Italiano")];
+pub const LANGUAGES: &[(&str, &str)] = &[
+    ("en", "English"),
+    ("de", "Deutsch"),
+    ("ja", "日本語"),
+    ("fr", "Français"),
+    ("es", "Español"),
+    ("it", "Italiano"),
+    ("nl", "Nederlands"),
+    ("da", "Dansk"),
+    ("nb", "Norsk bokmål"),
+    ("sv", "Svenska"),
+    ("fi", "Suomi"),
+    ("pt", "Português"),
+];
+
+/// Map the primary system locale to an OCR choice, independently of UI translations.
+/// Regional variants share a recognizer. Missing or unsupported locales use English.
+pub fn language_for_locale(locale: Option<&str>) -> &'static str {
+    let primary = locale.unwrap_or_default().trim().split(['-', '_', '.', '@']).next().unwrap_or_default();
+    // Older platforms use the generic Norwegian tag for Bokmål.
+    let primary = if primary.eq_ignore_ascii_case("no") { "nb" } else { primary };
+    LANGUAGES.iter().find(|(code, _)| code.eq_ignore_ascii_case(primary)).map_or("en", |(code, _)| *code)
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum OcrError {
@@ -258,6 +279,41 @@ pub fn text_layer(words: &[PlacedWord]) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn system_locale_selects_ocr_language_with_english_fallback() {
+        for (locale, expected) in [
+            ("de-AT", "de"),
+            ("de_CH.UTF-8", "de"),
+            ("JA-jp", "ja"),
+            ("fr-CA", "fr"),
+            ("es-MX", "es"),
+            ("it-IT", "it"),
+            ("nl-BE", "nl"),
+            ("da-DK", "da"),
+            ("nb-NO", "nb"),
+            ("no_NO", "nb"),
+            ("sv-FI", "sv"),
+            ("fi_FI", "fi"),
+            ("pt-BR", "pt"),
+            ("pt_PT@euro", "pt"),
+            (" EN-us ", "en"),
+            ("is-IS", "en"),
+            ("nn-NO", "en"),
+            ("zh-Hans", "en"),
+            ("C.UTF-8", "en"),
+            ("POSIX", "en"),
+            ("", "en"),
+            ("日本語", "en"),
+            ("deutsch", "en"),
+        ] {
+            assert_eq!(super::language_for_locale(Some(locale)), expected, "{locale}");
+        }
+        assert_eq!(super::language_for_locale(None), "en");
+        for (code, _) in super::LANGUAGES {
+            assert_eq!(super::language_for_locale(Some(code)), *code);
+        }
+    }
+
     use super::*;
 
     #[test]

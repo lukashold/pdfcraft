@@ -41,7 +41,7 @@ impl Default for OcrDraft {
             pages: OcrPages::All,
             from: 1,
             to: 1,
-            language: "en".into(),
+            language: pdfcraft_engine::ocr::language_for_locale(sys_locale::get_locale().as_deref()).into(),
             dpi: 300,
             auto_rotate: true,
             deskew: true,

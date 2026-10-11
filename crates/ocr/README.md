@@ -4,7 +4,8 @@
 `ATTRIBUTION.toml`. No document is uploaded and no model is downloaded at runtime.
 Release packages ship these files beside the application.
 
-- English, German, French, Spanish, Italian and horizontal Japanese use PaddlePaddle's
+- English, German, French, Spanish, Italian, Dutch, Danish, Norwegian Bokmål,
+  Swedish, Finnish, Portuguese and horizontal Japanese use PaddlePaddle's
   PP-OCRv6 small model through the existing Rust RTen runtime. The legacy English
   recognizer API remains available to existing callers.
 - PP-LCNet classifies quarter-turn orientation. Preprocessing centres on ink bounds,
@@ -32,6 +33,11 @@ default. Per-page `crop_box` results are in original PDF user space, before corr
 Corrections and OCR form one undo step; stale worker results and
 cancelled UI runs do not modify the document.
 
+The UI initially selects the primary OS/browser language independently of its interface
+translation. Regional locales such as `de-AT`, `nl-BE` and `pt-BR` use `de`, `nl` and
+`pt`; unavailable or unsupported locales fall back to English. Users can select a
+different document language. CLI/MCP calls retain English as their deterministic default.
+
 Limits: no perspective correction/dewarping, no guarantee on photos or ambiguous text,
 no vertical Japanese claim, and deskew refuses annotated pages rather than separating
 annotations from their targets. Supported OCR languages are deliberately limited to
@@ -46,3 +52,8 @@ fixtures and third-party document samples are not committed.
 The Italian regression recognizes all six accented vowels (`à è é ì ò ù`) in a
 synthetic sentence and checks that they survive saving/reopening without changing
 the scanned pixels. This is a regression fixture, not a real-document accuracy benchmark.
+
+The additional Latin-language regression checks Dutch `één`, `coöperatie`, `België`
+and accented words in Danish, Norwegian, Swedish, Finnish and Portuguese after
+save/reopen. The same model is used without per-language character restrictions.
+Icelandic remains unclaimed because community tests found weak recognition of þ/Þ and Í.

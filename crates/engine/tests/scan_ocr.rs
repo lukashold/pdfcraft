@@ -229,6 +229,37 @@ fn italian_ocr_preserves_all_six_accents_after_save() {
 }
 
 #[test]
+fn additional_latin_languages_keep_accented_words_after_save() {
+    if !ocr::available() {
+        eprintln!("skipped: run cargo xtask models");
+        return;
+    }
+    let samples: &[(&str, &str, &[&str])] = &[
+        ("nl", "Een coöperatie in België koopt één café.", &["coöperatie", "België", "één"]),
+        ("da", "Vi går på øen og læser bøger.", &["går", "på", "øen", "læser", "bøger"]),
+        ("nb", "Vi går på øya og leser bøker.", &["går", "på", "øya", "bøker"]),
+        ("sv", "Vi läser böcker på en ö nära staden.", &["läser", "böcker", "på", "ö", "nära"]),
+        ("fi", "Hyvää päivää ystävä. Täällä on lämmin kesä.", &["Hyvää", "päivää", "ystävä", "Täällä", "lämmin", "kesä"]),
+        ("pt", "A ação começa amanhã com café e música.", &["ação", "começa", "amanhã", "café", "música"]),
+    ];
+    for (language, sentence, expected) in samples {
+        let (mut s, id) = scan(sentence, 0, 0.0);
+        let before = render(&s, id);
+        s.recognize_text(id, &[], OcrSettings { language: (*language).into(), auto_rotate: false, deskew: false, ..Default::default() }).unwrap();
+        let saved = s.save_bytes(id).unwrap();
+        let reopened = s.open("recognized.pdf", None, saved, None).unwrap();
+        let extracted = text(&s, reopened);
+        for word in *expected {
+            assert!(
+                extracted.split_whitespace().any(|w| w.trim_matches(|c: char| !c.is_alphabetic()) == *word),
+                "{language} missing {word:?}: {extracted:?}"
+            );
+        }
+        assert_eq!(before, render(&s, reopened), "{language}: OCR must preserve scan pixels");
+    }
+}
+
+#[test]
 fn scan_recognizes_japanese_with_release_fonts() {
     if !ocr::available() || pdfcraft_fonts::CRAFT_FONTS.is_empty() {
         eprintln!("skipped: models and CRAFT_FONTS_DIR required");
