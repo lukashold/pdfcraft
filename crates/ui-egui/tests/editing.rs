@@ -50,6 +50,117 @@ fn organize(pages: usize) -> Harness<'static, PdfCraftApp> {
     harness(pages, |app| app.set_option("organize", "on").unwrap())
 }
 
+#[test]
+fn organize_tool_opens_the_overview_directly_and_can_be_reentered() {
+    let mut h = harness(12, |_| {});
+    assert!(!h.state().views[0].organize);
+    h.get_by_label("Organize pages").click();
+    h.run_steps(3);
+    assert!(h.state().views[0].organize);
+    h.get_by_label("Page 1");
+    h.get_by_label("Page 5");
+    h.get_by_label("Select page 2").click();
+    h.run_steps(2);
+    h.get_by_label("Close").click();
+    h.run_steps(2);
+    assert!(!h.state().views[0].organize);
+    h.state_mut().set_option("tool", "organize").unwrap();
+    h.state_mut().set_option("tool", "organize").unwrap();
+    h.run_steps(2);
+    assert!(h.state().views[0].organize, "entering the tool is idempotent");
+    assert_eq!(h.state().views[0].target_pages(), [1]);
+    h.state_mut().set_option("tool", "edit").unwrap();
+    h.run_steps(2);
+    assert!(!h.state().views[0].organize, "another tool returns to the document");
+}
+
+#[test]
+fn organize_tool_chosen_before_opening_a_document_shows_its_pages() {
+    let mut app = PdfCraftApp::new();
+    app.set_option("tool", "organize").unwrap();
+    app.open_bytes("doc.pdf", None, fixture(3)).unwrap();
+    assert!(app.views[0].organize);
+}
+
+#[test]
+fn organize_checkboxes_toggle_multiple_pages_without_modifiers() {
+    let mut h = organize(4);
+    h.get_by_label("Select page 1").click();
+    h.run_steps(2);
+    h.get_by_label("Select page 3").click();
+    h.run_steps(2);
+    assert_eq!(h.state().views[0].target_pages(), [0, 2]);
+    h.get_by_label("Select page 1").click();
+    h.run_steps(2);
+    assert_eq!(h.state().views[0].target_pages(), [2]);
+    h.get_by_label("Page 4").click_modifiers(Modifiers::SHIFT);
+    h.run_steps(2);
+    assert_eq!(h.state().views[0].target_pages(), [0, 1, 2, 3], "checkbox toggles update the range anchor");
+}
+
+#[test]
+fn organize_page_actions_rotate_only_the_named_page_and_undo() {
+    let mut h = organize(3);
+    h.get_by_label("Select page 1").click();
+    h.run_steps(2);
+    h.get_by_label("Select page 3").click();
+    h.run_steps(2);
+    h.get_by_label("Rotate page 1 clockwise").click();
+    h.run_steps(3);
+    let rotations = |h: &Harness<'static, PdfCraftApp>| {
+        h.state().session.get(h.state().views[0].id).unwrap().info.pages.iter().map(|p| p.rotation).collect::<Vec<_>>()
+    };
+    assert_eq!(rotations(&h), [90, 0, 0]);
+    assert_eq!(h.state().views[0].target_pages(), [0, 2], "a local action preserves the multi-selection");
+    h.get_by_label("Rotate counterclockwise").click();
+    h.run_steps(3);
+    assert_eq!(rotations(&h), [0, 0, 270], "toolbar actions apply to the selection");
+    h.key_press_modifiers(Modifiers::COMMAND, Key::Z);
+    h.run_steps(3);
+    assert_eq!(rotations(&h), [90, 0, 0]);
+    h.get_by_label("Rotate page 1 counterclockwise").click();
+    h.run_steps(3);
+    assert_eq!(rotations(&h), [0, 0, 0]);
+}
+
+#[test]
+fn organize_hover_actions_delete_only_the_named_page_and_undo() {
+    let mut h = organize(3);
+    h.get_by_label("Page 2").hover();
+    h.run_steps(2);
+    h.get_by_label("Delete page 2").click();
+    h.run_steps(3);
+    assert_eq!(page_texts(h.state()), ["Page 1", "Page 3"]);
+    h.key_press_modifiers(Modifiers::COMMAND, Key::Z);
+    h.run_steps(3);
+    assert_eq!(page_texts(h.state()), ["Page 1", "Page 2", "Page 3"]);
+    let single = organize(1);
+    assert!(single.get_by_label("Delete page 1").accesskit_node().is_disabled());
+}
+
+#[test]
+fn organize_local_actions_respect_document_permissions() {
+    let mut h = harness(3, |app| {
+        app.apply_edit(pdfcraft_engine::Edit::Protect(pdfcraft_engine::Protection {
+            permissions_password: Some("owner".into()),
+            changes: pdfcraft_engine::Changes::None,
+            ..Default::default()
+        }));
+        let bytes = app.session.save_bytes(app.views[0].id).unwrap();
+        app.open_bytes("restricted.pdf", None, bytes.as_ref().clone()).unwrap();
+        app.set_option("tool", "organize").unwrap();
+    });
+    h.get_by_label("Select page 2").click();
+    h.run_steps(2);
+    assert!(h.get_by_label("Rotate page 2 clockwise").accesskit_node().is_disabled());
+    assert!(h.get_by_label("Rotate page 2 counterclockwise").accesskit_node().is_disabled());
+    assert!(h.get_by_label("Delete page 2").accesskit_node().is_disabled());
+    let app = h.state();
+    let view = &app.views[app.active.unwrap()];
+    assert_eq!(view.target_pages(), [1]);
+    assert!(!app.session.get(view.id).unwrap().dirty);
+}
+
 /// Page labels of the active document, read back from its current bytes.
 fn page_texts(app: &PdfCraftApp) -> Vec<String> {
     let doc = app.session.get(app.views[0].id).unwrap();
@@ -1341,7 +1452,9 @@ fn zoomed_pages_in_view_are_rendered_at_the_size_drawn() {
         app.set_option("organize", "on").unwrap();
         app.set_option("grid-zoom", "300").unwrap();
     });
-    let drawn = 146.0 * 3.0 * h.ctx.pixels_per_point();
+    // The 200 × 300 fixture fits by height; keep its aspect ratio instead of stretching
+    // it to the full cell width. Request enough pixels for that actual preview width.
+    let drawn = 194.0 * 3.0 * (200.0 / 300.0) * h.ctx.pixels_per_point();
     let sharp = |h: &Harness<'static, PdfCraftApp>, page| h.state().views[0].grid_page_pixels(page);
     for _ in 0..200 {
         if sharp(&h, 0).is_some_and(|w| w as f32 >= drawn * 0.9) {

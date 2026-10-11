@@ -961,6 +961,13 @@ impl PdfCraftApp {
             self.active = Some(self.views.len() - 1);
         }
         self.apply_initial_view(self.views.len() - 1, &initial);
+        if activate
+            && self.left_open
+            && self.left == LeftPanel::Tool("organize")
+            && let Some(view) = self.views.last_mut()
+        {
+            view.organize = true;
+        }
         if activate && let Some(mode) = self.mode_override {
             // Explicit mode options do not reset independent --tool / --left choices.
             self.mode = mode;
@@ -1353,10 +1360,23 @@ impl PdfCraftApp {
         self.pending_panel_reveals.push(docking::Panel::Tools);
     }
 
+    /// Enter a tool from the catalogue, Home, palette or control channel. Organize is a
+    /// workspace, so opening its panel also opens the page grid (without toggling it off).
+    pub(crate) fn select_tool(&mut self, id: &'static str) {
+        self.left = LeftPanel::Tool(id);
+        self.reveal_tools();
+        if let Some(view) = self.active.and_then(|i| self.views.get_mut(i)) {
+            view.organize = id == "organize";
+        }
+    }
+
     /// Select the workspace and its matching tool panel, just like the mode bar.
     pub(crate) fn select_mode(&mut self, mode: Mode) {
         self.mode = mode;
         self.reveal_tools();
+        if let Some(view) = self.active.and_then(|i| self.views.get_mut(i)) {
+            view.organize = false;
+        }
         self.left = match mode {
             Mode::Edit => LeftPanel::Tool("edit"),
             Mode::Convert => LeftPanel::Tool("export"),
@@ -1615,8 +1635,7 @@ impl PdfCraftApp {
             ("date-language", _) => self.session.set_date_language(Some(value).filter(|v| *v != "auto"))?,
             ("tool", _) => {
                 let g = pdfcraft_engine::catalog::group(value).ok_or_else(|| format!("unknown tool {value}"))?;
-                self.left = LeftPanel::Tool(g.id);
-                self.reveal_tools();
+                self.select_tool(g.id);
             }
             ("left", _) => self.left_open = value != "closed",
             ("home", _) => self.active = None,

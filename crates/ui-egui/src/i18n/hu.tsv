@@ -2210,3 +2210,7 @@ key	Space	Szóköz
 	Crop scanner borders to the paper edge	Beolvasási szegélyek levágása a papír széléig
 	Safety margin (pt)	Biztonsági margó (pt)
 	Only clear paper edges are cropped. Indistinguishable white borders are kept.	Csak a jól felismerhető papírszéleket vágja körbe. A megkülönböztethetetlen fehér szegélyek megmaradnak.
+	Select page {label}	{label}. oldal kijelölése
+	Rotate page {label} counterclockwise	{label}. oldal elforgatása az óramutató járásával ellentétesen
+	Rotate page {label} clockwise	{label}. oldal elforgatása az óramutató járásával megegyezően
+	Delete page {label}	{label}. oldal törlése

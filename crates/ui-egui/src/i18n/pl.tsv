@@ -2207,3 +2207,7 @@ key	Space	Spacja
 	Crop scanner borders to the paper edge	Przytnij obramowanie skanu do krawędzi papieru
 	Safety margin (pt)	Margines bezpieczeństwa (pkt)
 	Only clear paper edges are cropped. Indistinguishable white borders are kept.	Przycinane są tylko wyraźne krawędzie papieru. Nierozróżnialne białe marginesy zostają zachowane.
+	Select page {label}	Wybierz stronę {label}
+	Rotate page {label} counterclockwise	Obróć stronę {label} w lewo
+	Rotate page {label} clockwise	Obróć stronę {label} w prawo
+	Delete page {label}	Usuń stronę {label}

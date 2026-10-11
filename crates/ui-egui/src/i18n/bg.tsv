@@ -2174,3 +2174,7 @@ key	Space	Интервал
 	Crop scanner borders to the paper edge	Изрязване на сканираното до ръба на хартията
 	Safety margin (pt)	Предпазно поле (pt)
 	Only clear paper edges are cropped. Indistinguishable white borders are kept.	Изрязват се само ясно различими ръбове на хартията. Неразличимите бели полета се запазват.
+	Select page {label}	Избиране на страница {label}
+	Rotate page {label} counterclockwise	Завъртане на страница {label} обратно на часовниковата стрелка
+	Rotate page {label} clockwise	Завъртане на страница {label} по часовниковата стрелка
+	Delete page {label}	Изтриване на страница {label}

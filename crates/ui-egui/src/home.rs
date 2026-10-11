@@ -5,7 +5,7 @@ use egui::{Align2, CornerRadius, Rect, Sense, Stroke, vec2};
 use pdfcraft_engine::catalog;
 
 use crate::theme::{self, Tokens};
-use crate::{LeftPanel, PdfCraftApp, icons, panels::human_size, widgets};
+use crate::{PdfCraftApp, icons, panels::human_size, widgets};
 
 const RECOMMENDED: [&str; 5] = ["organize", "comment", "form", "edit", "protect"];
 
@@ -28,9 +28,8 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                 .show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.horizontal(|ui| {
-                        widgets::artcraft_mark(ui, 28.0);
                         ui.vertical(|ui| {
-                            ui.label(egui::RichText::new(tl!("Join the ArtCraft community")).font(theme::semibold(15.0)));
+                            ui.label(egui::RichText::new("PdfCraft Preview").font(theme::semibold(15.0)));
                             ui.label(egui::RichText::new(tl!("Get help, share feedback and follow development on Discord.")).color(t.text_muted));
                         });
                     });
@@ -86,8 +85,7 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                             );
                             let resp = if title_elided || blurb_elided { resp.on_hover_text(format!("{}\n{blurb}", tl!(g.label))) } else { resp };
                             if resp.clicked() {
-                                app.left = LeftPanel::Tool(g.id);
-                                app.left_open = true;
+                                app.select_tool(g.id);
                             }
                         }
                         let (rect, resp) = ui.allocate_exact_size(vec2(170.0, 104.0), Sense::click());

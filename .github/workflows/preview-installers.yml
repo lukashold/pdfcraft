@@ -8,6 +8,7 @@ on:
       - 'apps/**'
       - 'packaging/**'
       - 'Cargo.*'
+      - '.github/workflows/preview-installers.yml'
   workflow_dispatch:
 
 permissions:

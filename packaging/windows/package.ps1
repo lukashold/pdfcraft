@@ -94,6 +94,14 @@ foreach ($f in 'LICENSE-MIT', 'LICENSE-APACHE', 'NOTICE') {
 }
 Copy-Item (Join-Path $Root 'assets\app-icon\LICENSE-document.txt') $Stage
 
+# Every embedded font's copyright and licence travels in the MSI as well as the ZIP.
+$FontLicenses = @(Get-ChildItem (Join-Path $Root 'assets/fonts/OFL-*.txt'))
+if ($env:CRAFT_FONTS_DIR) {
+  $FontLicenses += @(Get-ChildItem (Join-Path $env:CRAFT_FONTS_DIR 'fonts/*/OFL.txt'))
+}
+$FontLicenses | ForEach-Object { Get-Content -LiteralPath $_.FullName; '' } |
+  Set-Content -Encoding utf8 (Join-Path $Stage 'LICENSE-fonts.txt')
+
 & (Join-Path $PSScriptRoot 'sign.ps1') (Join-Path $Stage 'pdfcraft.exe') (Join-Path $Stage 'pdfcraft-cli.exe')
 
 # OCR models (#103): the app looks in models\ beside pdfcraft.exe. `cargo xtask models` fetches every
@@ -128,7 +136,7 @@ $Portable = Join-Path $TargetDir "windows-package\pdfcraft-$Version-windows-$Arc
 Remove-Item -Recurse -Force $Portable -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $Portable | Out-Null
 Copy-Item (Join-Path $Stage '*.exe') $Portable
-foreach ($f in 'NOTICE', 'LICENSE-document.txt') {
+foreach ($f in 'NOTICE', 'LICENSE-document.txt', 'LICENSE-fonts.txt') {
   Copy-Item (Join-Path $Stage $f) $Portable
 }
 Copy-Item -Recurse $Models (Join-Path $Portable 'models')

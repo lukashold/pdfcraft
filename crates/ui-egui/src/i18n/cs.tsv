@@ -198,3 +198,7 @@ key	Space	Mezerník
 	Crop scanner borders to the paper edge	Oříznout okraje skenu k hraně papíru
 	Safety margin (pt)	Ochranný okraj (b.)
 	Only clear paper edges are cropped. Indistinguishable white borders are kept.	Oříznou se pouze zřetelné hrany papíru. Nerozlišitelné bílé okraje zůstanou zachovány.
+	Select page {label}	Vybrat stránku {label}
+	Rotate page {label} counterclockwise	Otočit stránku {label} proti směru hodinových ručiček
+	Rotate page {label} clockwise	Otočit stránku {label} po směru hodinových ručiček
+	Delete page {label}	Odstranit stránku {label}

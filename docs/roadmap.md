@@ -1,6 +1,6 @@
 # PdfCraft roadmap: milestones and what's next
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** minor (localized shortcut labels, #496; alpha gate added; convert-and-share re-judged with the cross-app rule → alpha) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-11 · **Change:** minor (combined organizer and scan preview installers; localized shortcut labels, #496; alpha gate added; convert-and-share re-judged with the cross-app rule → alpha) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
 
 Forward-looking: the milestones, the current focus and what comes next. The parity numbers behind
 it are in [target-app-parity.md](target-app-parity.md), the ranked work list in [gaps.md](gaps.md),
@@ -118,6 +118,8 @@ M2 (renderer), M7 (content editing), M10 (OCR and Office), M11 (Preflight and st
 - Unmeasured fidelity: without an Acrobat comparison harness, quality gaps surface as user reports.
 
 ## Revision history
+
+- 2026-10-11: M14 preview packaging combines the organizer and scan changes for Windows x64/ARM64 and macOS universal. This does not change the official release status or milestone percentages.
 
 - 2026-10-11: M10 multilingual scan recognition and orientation/deskew correction; overall milestone percentage unchanged.
 - 2026-10-11: M10 automatic scanner-border crop at clear paper edges, adjustable padding, and shared OCR/rotation/deskew undo. Indistinguishable white edges remain open; percentage unchanged.

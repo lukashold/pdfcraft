@@ -2142,3 +2142,7 @@ key	Space	స్పేస్
 	Crop scanner borders to the paper edge	స్కాన్ అంచులను కాగితం అంచు వరకు కత్తిరించు
 	Safety margin (pt)	భద్రతా అంచు (pt)
 	Only clear paper edges are cropped. Indistinguishable white borders are kept.	స్పష్టమైన కాగితం అంచులు మాత్రమే కత్తిరించబడతాయి. గుర్తించలేని తెల్ల అంచులు అలాగే ఉంటాయి.
+	Select page {label}	{label} పేజీని ఎంచుకోండి
+	Rotate page {label} counterclockwise	{label} పేజీని అపసవ్య దిశలో తిప్పండి
+	Rotate page {label} clockwise	{label} పేజీని సవ్య దిశలో తిప్పండి
+	Delete page {label}	{label} పేజీని తొలగించండి

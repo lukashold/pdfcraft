@@ -2125,3 +2125,7 @@ key	Space	Пробел
 	Crop scanner borders to the paper edge	Обрезать поля скана до края бумаги
 	Safety margin (pt)	Защитное поле (пт)
 	Only clear paper edges are cropped. Indistinguishable white borders are kept.	Обрезаются только чёткие края бумаги. Неразличимые белые поля сохраняются.
+	Select page {label}	Выбрать страницу {label}
+	Rotate page {label} counterclockwise	Повернуть страницу {label} против часовой стрелки
+	Rotate page {label} clockwise	Повернуть страницу {label} по часовой стрелке
+	Delete page {label}	Удалить страницу {label}

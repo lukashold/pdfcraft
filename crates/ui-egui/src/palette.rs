@@ -5,7 +5,7 @@ use egui::{Align2, CornerRadius, Rect, Sense, Stroke, vec2};
 use pdfcraft_engine::catalog::{Availability, TOOL_GROUPS};
 
 use crate::theme::{self, Tokens};
-use crate::{LeftPanel, PdfCraftApp, icons};
+use crate::{PdfCraftApp, icons};
 
 struct Hit {
     /// The tool panel to open (tools and catalogue items); `None` for plain commands.
@@ -184,8 +184,7 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
         app.palette_open = false;
         app.palette_query.clear();
         if let Some(g) = group {
-            app.left_open = true;
-            app.left = LeftPanel::Tool(g);
+            app.select_tool(g);
         }
         if let Some(c) = command {
             app.run_command(c);

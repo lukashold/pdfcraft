@@ -2212,3 +2212,7 @@ key	Space	スペース
 	Crop scanner borders to the paper edge	スキャンの余白を用紙の端まで切り抜く
 	Safety margin (pt)	安全余白（pt）
 	Only clear paper edges are cropped. Indistinguishable white borders are kept.	明確な用紙の端だけを切り抜きます。区別できない白い余白は保持します。
+	Select page {label}	ページ {label} を選択
+	Rotate page {label} counterclockwise	ページ {label} を反時計回りに回転
+	Rotate page {label} clockwise	ページ {label} を時計回りに回転
+	Delete page {label}	ページ {label} を削除

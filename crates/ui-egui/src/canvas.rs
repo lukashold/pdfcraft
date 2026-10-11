@@ -3301,10 +3301,10 @@ fn organize_toolbar(view: &mut DocView, info: &DocInfo, editable: bool, dirty: b
             // Fixed width so the buttons never shift as the selection text changes.
             ui.add_sized([150.0, 30.0], egui::Label::new(egui::RichText::new(label).font(theme::medium(13.0)).color(t.text_muted)).truncate());
             ui.add_enabled_ui(editable, |ui| {
-                if icons::button(ui, "rotate-ccw", 30.0, false, "Rotate counterclockwise").clicked() {
+                if icons::button(ui, "rotate-ccw", 30.0, false, tl!("Rotate counterclockwise")).clicked() {
                     view.pending_edit = Some(Edit::RotatePages { pages: targets.clone(), degrees: -90 });
                 }
-                if icons::button(ui, "rotate-cw", 30.0, false, "Rotate clockwise").clicked() {
+                if icons::button(ui, "rotate-cw", 30.0, false, tl!("Rotate clockwise")).clicked() {
                     view.pending_edit = Some(Edit::RotatePages { pages: targets.clone(), degrees: 90 });
                 }
                 let can_delete = targets.len() < n;
@@ -3448,7 +3448,7 @@ fn gap_button(ui: &mut egui::Ui, gap: usize, at: Pos2, height: f32, label: Strin
 fn organize_grid(view: &mut DocView, info: &DocInfo, editable: bool, dirty: bool, unobstructed: bool, ui: &mut egui::Ui, t: &Tokens) {
     let ppp = ui.ctx().pixels_per_point();
     // The page image scales with the zoom; the padding and the page number don't.
-    let cell = vec2(146.0 * view.grid_zoom + 44.0, 194.0 * view.grid_zoom + 56.0);
+    let cell = vec2(146.0 * view.grid_zoom + 44.0, 194.0 * view.grid_zoom + 88.0);
     let anchor = view.grid_anchor.take();
     let mut open_page = None;
     organize_toolbar(view, info, editable, dirty, unobstructed, ui, t);
@@ -3506,10 +3506,10 @@ fn organize_grid(view: &mut DocView, info: &DocInfo, editable: bool, dirty: bool
                 if resp.drag_stopped() {
                     drop = true;
                 }
-                let info = crate::i18n::fmt(tl!("Page {label}"), &[("label", &p.label)]);
-                resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Checkbox, true, view.selected.contains(&i), info.clone()));
-                let s = (cell.x - 44.0) / p.width.max(1.0);
-                let size = vec2(p.width * s, p.height * s).min(vec2(cell.x - 44.0, cell.y - 56.0));
+                let page_label = crate::i18n::fmt(tl!("Page {label}"), &[("label", &p.label)]);
+                resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Checkbox, true, view.selected.contains(&i), page_label.clone()));
+                let s = ((cell.x - 60.0) / p.width.max(1.0)).min((cell.y - 88.0) / p.height.max(1.0));
+                let size = vec2(p.width * s, p.height * s);
                 let pr = Rect::from_center_size(pos2(c.center().x, c.top() + 16.0 + size.y / 2.0), size);
                 let selected = view.selected.contains(&i) || (view.selected.is_empty() && i == view.current);
                 if selected || resp.hovered() {
@@ -3536,7 +3536,43 @@ fn organize_grid(view: &mut DocView, info: &DocInfo, editable: bool, dirty: bool
                     ui.painter().image(tex.id(), pr, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
                 }
                 ui.painter().rect_stroke(pr, CornerRadius::ZERO, Stroke::new(1.0, t.border), egui::StrokeKind::Outside);
-                ui.painter().text(pos2(c.center().x, pr.bottom() + 16.0), Align2::CENTER_CENTER, &p.label, theme::medium(12.0), t.text_muted);
+                ui.painter().text(pos2(c.center().x, c.bottom() - 48.0), Align2::CENTER_CENTER, &p.label, theme::medium(12.0), t.text_muted);
+                // The checkbox toggles just this page without requiring a modifier. Keep it
+                // outside the page image, including on very tall or wide pages.
+                let mut checked = view.selected.contains(&i);
+                let check_rect = Rect::from_min_size(c.min + vec2(8.0, 8.0), Vec2::splat(20.0));
+                let check = ui.push_id(("org-check", i), |ui| ui.put(check_rect, egui::Checkbox::without_text(&mut checked))).inner;
+                let label = crate::i18n::fmt(tl!("Select page {label}"), &[("label", &p.label)]);
+                check.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Checkbox, true, checked, label.clone()));
+                if check.on_hover_text(label).changed() {
+                    view.click_page(i, egui::Modifiers::COMMAND, false);
+                    view.current = i;
+                }
+                // Local actions always target the labelled page. The toolbar above the grid
+                // remains the place for actions on the whole selection.
+                if selected || resp.contains_pointer() || resp.has_focus() {
+                    let actions = Rect::from_center_size(pos2(c.center().x, c.bottom() - 24.0), vec2(84.0, 26.0));
+                    ui.scope_builder(
+                        egui::UiBuilder::new().id_salt(("org-actions", i)).max_rect(actions).layout(egui::Layout::left_to_right(egui::Align::Center)),
+                        |ui| {
+                            ui.spacing_mut().item_spacing.x = 3.0;
+                            ui.add_enabled_ui(editable, |ui| {
+                                for (icon, degrees, key) in
+                                    [("rotate-ccw", -90, "Rotate page {label} counterclockwise"), ("rotate-cw", 90, "Rotate page {label} clockwise")]
+                                {
+                                    let label = crate::i18n::fmt(tl!(key), &[("label", &p.label)]);
+                                    if icons::button(ui, icon, 26.0, false, &label).clicked() {
+                                        view.pending_edit = Some(Edit::RotatePages { pages: vec![i], degrees });
+                                    }
+                                }
+                                let label = crate::i18n::fmt(tl!("Delete page {label}"), &[("label", &p.label)]);
+                                if ui.add_enabled_ui(info.pages.len() > 1, |ui| icons::button(ui, "trash-2", 26.0, false, &label)).inner.clicked() {
+                                    view.pending_edit = Some(Edit::DeletePages { pages: vec![i] });
+                                }
+                            });
+                        },
+                    );
+                }
                 if resp.clicked() {
                     let m = ui.input(|i| i.modifiers);
                     view.click_page(i, m, false);
@@ -3568,20 +3604,20 @@ fn organize_grid(view: &mut DocView, info: &DocInfo, editable: bool, dirty: bool
         }
         // Between pages (and at both ends): insert files right there.
         if editable && !middle_gesture && view.org_drag.is_none() {
-            let mid = |r: &Rect| r.top() + 16.0 + (cell.y - 56.0) / 2.0;
+            let mid = |r: &Rect| r.top() + 16.0 + (cell.y - 88.0) / 2.0;
             for (i, c) in &cells {
                 let label = info
                     .pages
                     .get(*i)
                     .map(|p| crate::i18n::fmt(tl!("Insert a file before page {label}"), &[("label", &p.label)]))
                     .unwrap_or_default();
-                if gap_button(ui, *i, pos2(c.left(), mid(c)), cell.y - 56.0, label, t) {
+                if gap_button(ui, *i, pos2(c.left(), mid(c)), cell.y - 88.0, label, t) {
                     view.pending_action = Some(ViewAction::InsertFromFileAt(*i));
                 }
             }
             if let Some((i, c)) = cells.last()
                 && i + 1 == info.pages.len()
-                && gap_button(ui, i + 1, pos2(c.right(), mid(c)), cell.y - 56.0, tl!("Insert a file at the end").to_string(), t)
+                && gap_button(ui, i + 1, pos2(c.right(), mid(c)), cell.y - 88.0, tl!("Insert a file at the end").to_string(), t)
             {
                 view.pending_action = Some(ViewAction::InsertFromFileAt(i + 1));
             }

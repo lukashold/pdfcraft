@@ -2232,3 +2232,7 @@ key	Space	مسافة
 	Crop scanner borders to the paper edge	قص حواف المسح حتى حافة الورق
 	Safety margin (pt)	هامش الأمان (نقطة)
 	Only clear paper edges are cropped. Indistinguishable white borders are kept.	يتم قص حواف الورق الواضحة فقط. تُحفظ الحواف البيضاء التي لا يمكن تمييزها.
+	Select page {label}	تحديد الصفحة {label}
+	Rotate page {label} counterclockwise	تدوير الصفحة {label} عكس اتجاه عقارب الساعة
+	Rotate page {label} clockwise	تدوير الصفحة {label} باتجاه عقارب الساعة
+	Delete page {label}	حذف الصفحة {label}

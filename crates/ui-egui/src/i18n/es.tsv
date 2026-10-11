@@ -2128,3 +2128,7 @@ key	Space	Espacio
 	Crop scanner borders to the paper edge	Recortar los bordes del escaneo hasta el papel
 	Safety margin (pt)	Margen de seguridad (pt)
 	Only clear paper edges are cropped. Indistinguishable white borders are kept.	Solo se recortan los bordes claros del papel. Se conservan los bordes blancos indistinguibles.
+	Select page {label}	Seleccionar la página {label}
+	Rotate page {label} counterclockwise	Girar la página {label} en sentido antihorario
+	Rotate page {label} clockwise	Girar la página {label} en sentido horario
+	Delete page {label}	Eliminar la página {label}

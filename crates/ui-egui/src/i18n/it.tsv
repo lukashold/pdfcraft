@@ -2219,3 +2219,7 @@ key	Space	Spazio
 	Crop scanner borders to the paper edge	Ritaglia i bordi della scansione fino al foglio
 	Safety margin (pt)	Margine di sicurezza (pt)
 	Only clear paper edges are cropped. Indistinguishable white borders are kept.	Vengono ritagliati solo i bordi riconoscibili del foglio. I bordi bianchi indistinguibili vengono mantenuti.
+	Select page {label}	Seleziona pagina {label}
+	Rotate page {label} counterclockwise	Ruota pagina {label} in senso antiorario
+	Rotate page {label} clockwise	Ruota pagina {label} in senso orario
+	Delete page {label}	Elimina pagina {label}

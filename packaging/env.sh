@@ -57,6 +57,7 @@ copy_docs() {
 # its fonts, so the package carries their licences: fonts/<family>/OFL.txt -> OFL-<family>.txt.
 copy_font_licences() {
   local dest="$1" f family
+  cp "$ROOT"/assets/fonts/OFL-*.txt "$dest/"
   [ -n "${CRAFT_FONTS_DIR:-}" ] || return 0
   for f in "$CRAFT_FONTS_DIR"/fonts/*/OFL.txt; do
     [ -f "$f" ] || continue

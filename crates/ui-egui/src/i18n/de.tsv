@@ -2212,3 +2212,7 @@ key	Space	Leertaste
 	Crop scanner borders to the paper edge	Scanränder bis zur Papierkante beschneiden
 	Safety margin (pt)	Sicherheitsrand (pt)
 	Only clear paper edges are cropped. Indistinguishable white borders are kept.	Nur erkennbare Papierkanten werden beschnitten. Nicht unterscheidbare weiße Ränder bleiben erhalten.
+	Select page {label}	Seite {label} auswählen
+	Rotate page {label} counterclockwise	Seite {label} gegen den Uhrzeigersinn drehen
+	Rotate page {label} clockwise	Seite {label} im Uhrzeigersinn drehen
+	Delete page {label}	Seite {label} löschen
