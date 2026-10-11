@@ -165,6 +165,8 @@ Assert-Equal $control[0] '163' 'Start on install, stop on upgrade/removal, delet
 Assert-Equal $control[1] '1' 'Wait for graceful service stop'
 $acl = Read-Row 'SELECT `SDDLText` FROM `MsiLockPermissionsEx` WHERE `LockObject` = ''HotFolderData''' 1
 Assert-Equal $acl[0] 'D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-19)(A;OICI;GRGX;;;BU)' 'Protected task directory'
+$secrets = Read-Row 'SELECT `SDDLText` FROM `MsiLockPermissionsEx` WHERE `LockObject` = ''HotFolderSecrets''' 1
+Assert-Equal $secrets[0] 'D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-19)' 'Credentials must not be readable by ordinary users'
 $shortcut = Read-Row 'SELECT `Target`, `Arguments` FROM `Shortcut` WHERE `Shortcut` = ''HotFolderStartMenuShortcut''' 2
 Assert-Equal $shortcut[0] '[#PdfcraftHotFolderExe]' 'Hot Folder shortcut executable'
 Assert-Equal $shortcut[1] '--config "[HotFolderData]tasks.json"' 'GUI and service use the same tasks'

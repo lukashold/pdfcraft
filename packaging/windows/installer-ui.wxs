@@ -22,7 +22,8 @@
           <!-- CostFinalize precedes the welcome dialog, so apply the user's feature choice here. -->
           <Publish Event="AddLocal" Value="HotFolder" Condition="INSTALLHOTFOLDER = 1" Order="1" />
           <Publish Event="Remove" Value="HotFolder" Condition="INSTALLHOTFOLDER &lt;&gt; 1" Order="2" />
-          <Publish Event="EndDialog" Value="Return" Order="3" />
+          <Publish Property="INSTALLHOTFOLDER" Value="0" Condition="INSTALLHOTFOLDER &lt;&gt; 1" Order="3" />
+          <Publish Event="EndDialog" Value="Return" Order="4" />
         </Control>
         <Control Id="Cancel" Type="PushButton" X="280" Y="190" Width="70" Height="23" Cancel="yes" Text="Cancel">
           <Publish Event="EndDialog" Value="Exit" />

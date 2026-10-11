@@ -11,7 +11,9 @@ Copy-Item -LiteralPath 'assets/app-icon/LICENSE-document.txt' -Destination $stag
 Set-Content -LiteralPath "$stage/models/detection.rten" -Value 'synthetic installer fixture; never an OCR model'
 Set-Content -LiteralPath "$stage/models/recognition.rten" -Value 'synthetic installer fixture; never an OCR model'
 $msi = Join-Path $stage 'service-test.msi'
-& wix build packaging/windows/pdfcraft.wxs packaging/windows/installer-ui.wxs -arch x64 -d Version=0.6.0 -d "BinDir=$stage" -d "ModelsDir=$stage/models" -d 'IconPath=assets/app-icon/pdfcraft.ico' -o $msi
+& wix extension add -g WixToolset.Util.wixext/5.0.2
+if ($LASTEXITCODE -ne 0) { throw 'WiX extension installation failed' }
+& wix build packaging/windows/pdfcraft.wxs packaging/windows/installer-ui.wxs -arch x64 -ext WixToolset.Util.wixext -d Version=0.6.0 -d "BinDir=$stage" -d "ModelsDir=$stage/models" -d 'IconPath=assets/app-icon/pdfcraft.ico' -o $msi
 if ($LASTEXITCODE -ne 0) { throw 'WiX compilation failed' }
 & pwsh -NoProfile -File packaging/windows/test-msi.ps1 $msi
 if ($LASTEXITCODE -ne 0) { throw 'Compiled MSI validation failed' }
@@ -19,7 +21,7 @@ function Invoke-Msi([string] $Options, [string] $Name) {
   $log = Join-Path $stage "$Name.log"
   $process = Start-Process -FilePath msiexec.exe -ArgumentList "$Options /qn /norestart /l*v `"$log`"" -Wait -PassThru -WindowStyle Hidden
   if ($process.ExitCode -notin @(0,3010)) {
-    Get-Content -LiteralPath $log -Tail 100
+    Select-String -LiteralPath $log -Pattern 'Return value 3|Error [0-9]|failed' -Context 12,4
     throw "MSI $Name failed: $($process.ExitCode)"
   }
 }

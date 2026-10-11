@@ -38,3 +38,9 @@ jobs:
       - if: runner.os == 'Windows'
         shell: pwsh
         run: packaging/service-tests/windows-msi.ps1
+      - if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hot-folder-msi-lifecycle-logs
+          path: ${{ runner.temp }}/hot-folder-msi/*.log
+          if-no-files-found: ignore

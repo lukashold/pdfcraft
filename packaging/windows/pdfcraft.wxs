@@ -9,7 +9,7 @@
   and in Default apps, never forced as the default). Files opened with PdfCraft arrive on its
   command line.
 -->
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package
       Name="PdfCraft"
       Manufacturer="Learning Machines LLC"
@@ -42,6 +42,11 @@
     <Property Id="INSTALLDESKTOPSHORTCUT" Value="1" Secure="yes" />
     <!-- Opt-in companion. INSTALLHOTFOLDER=1 also works for unattended deployment. -->
     <Property Id="INSTALLHOTFOLDER" Secure="yes" />
+    <Property Id="HOTFOLDERPRESENT" Secure="yes">
+      <RegistrySearch Id="ExistingHotFolder" Root="HKLM" Key="Software\PdfCraft\HotFolder" Name="TaskFile" Type="raw" />
+    </Property>
+    <SetProperty Id="INSTALLHOTFOLDER" Value="1" After="AppSearch" Sequence="both"
+        Condition="HOTFOLDERPRESENT AND NOT INSTALLHOTFOLDER" />
     <UIRef Id="PdfcraftInstallerUI" />
 
     <StandardDirectory Id="ProgramFiles6432Folder">
@@ -53,7 +58,9 @@
     <StandardDirectory Id="DesktopFolder" />
     <StandardDirectory Id="CommonAppDataFolder">
       <Directory Id="PdfcraftProgramData" Name="PdfCraft">
-        <Directory Id="HotFolderData" Name="HotFolder" />
+        <Directory Id="HotFolderData" Name="HotFolder">
+          <Directory Id="HotFolderSecrets" Name="secrets" />
+        </Directory>
       </Directory>
     </StandardDirectory>
 
@@ -77,13 +84,18 @@
             Type="ownProcess" Start="auto" ErrorControl="normal" Vital="yes"
             Account="NT AUTHORITY\LocalService"
             Arguments="--service --config &quot;[HotFolderData]tasks.json&quot;">
-          <ServiceConfigFailureActions OnInstall="yes" OnReinstall="yes" ResetPeriod="86400">
-            <Failure Action="restartService" Delay="10000" />
-            <Failure Action="restartService" Delay="60000" />
-          </ServiceConfigFailureActions>
+          <util:ServiceConfig FirstFailureActionType="restart" SecondFailureActionType="restart"
+              ThirdFailureActionType="none" ResetPeriodInDays="1" RestartServiceDelayInSeconds="10" />
         </ServiceInstall>
         <ServiceControl Id="HotFolderServiceControl" Name="PdfCraftHotFolder"
             Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+      </Component>
+      <Component Id="PdfcraftHotFolderSecrets" Directory="HotFolderSecrets" Guid="4D641968-81D3-474E-867D-C03E18E80584">
+        <CreateFolder>
+          <PermissionEx Sddl="D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-19)" />
+        </CreateFolder>
+        <RegistryValue Root="HKLM" Key="Software\PdfCraft\HotFolder" Name="SecretsDirectory"
+            Type="string" Value="[HotFolderSecrets]" KeyPath="yes" />
       </Component>
       <Component Id="PdfcraftHotFolderData" Directory="HotFolderData" Guid="6A9F747C-23E8-4242-9779-157B44B4CBF0">
         <!-- An unelevated user may inspect task state, but only administrators and the
