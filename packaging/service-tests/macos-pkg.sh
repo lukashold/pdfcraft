@@ -31,7 +31,7 @@ EOF
 sudo installer -pkg "$work/PdfCraft.pkg" -target / -applyChoiceChangesXML "$work/choices.plist"
 probe='/Applications/PdfCraft Hot Folder.app/Contents/MacOS/PdfCraft Hot Folder'
 config="$HOME/Library/Application Support/PdfCraft/HotFolder/tasks.json"
-for attempt in $(seq 1 40); do
+for _attempt in $(seq 1 40); do
   [ -f "${config%.json}.heartbeat" ] && break
   sleep 0.25
 done

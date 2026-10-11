@@ -10,6 +10,8 @@ directory="$RUNNER_TEMP/Hot Folder service test"
 mkdir -m 700 "$directory"
 config="$directory/tasks.json"
 (umask 077; printf '{}\n' > "$config")
+# The diagnostic log intentionally belongs to the unprivileged CI account.
+# shellcheck disable=SC2024
 if sudo "$probe" --service --config "$config" > "$directory/root-run.log" 2>&1; then
   echo 'The processing worker must reject root execution' >&2; exit 1
 fi
@@ -18,7 +20,7 @@ test ! -e "$directory/tasks.heartbeat"
 cleanup() { sudo "$probe" --service-action uninstall --config "$config" || true; }
 trap cleanup EXIT
 sudo "$probe" --service-action install --account "$(id -un)" --config "$config"
-for attempt in $(seq 1 40); do
+for _attempt in $(seq 1 40); do
   [ -f "$directory/tasks.heartbeat" ] && break
   sleep 0.25
 done
@@ -27,7 +29,7 @@ test -f "$directory/tasks.heartbeat"
 sudo "$probe" --service-action disable --config "$config" | grep 'enabled=false'
 sudo "$probe" --service-action enable --config "$config" | grep 'enabled=true'
 sudo "$probe" --service-action stop --config "$config"
-for attempt in $(seq 1 40); do
+for _attempt in $(seq 1 40); do
   [ -f "$directory/tasks.stopped" ] && break
   sleep 0.25
 done

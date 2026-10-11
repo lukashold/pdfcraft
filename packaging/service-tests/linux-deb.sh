@@ -22,7 +22,7 @@ nfpm package -f "$work/nfpm.yaml" -p deb -t "$work/hot-folder.deb"
 sudo dpkg -i "$work/hot-folder.deb"
 probe=/usr/bin/pdfcraft-hot-folder
 config=/var/lib/pdfcraft-hot-folder/tasks.json
-for attempt in $(seq 1 40); do
+for _attempt in $(seq 1 40); do
   sudo test -f /var/lib/pdfcraft-hot-folder/tasks.heartbeat && break
   sleep 0.25
 done
