@@ -51,9 +51,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: preview-windows-${{ matrix.arch }}
-      - name: Identify the preview version
-        shell: bash
-        run: cargo xtask version set "$PDFCRAFT_VERSION"
       - name: Install WiX
         shell: pwsh
         run: dotnet tool install --global wix --version 5.0.2
@@ -97,8 +94,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: preview-macos-universal
-      - name: Identify the preview version
-        run: cargo xtask version set "$PDFCRAFT_VERSION"
       - name: Build and verify ad-hoc signed DMG with OCR models
         env:
           CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
