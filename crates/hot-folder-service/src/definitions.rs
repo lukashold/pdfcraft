@@ -24,11 +24,16 @@ pub fn windows_command(executable: &str, config: &str) -> Result<String, String>
 
 #[cfg(any(windows, test))]
 pub fn windows_command_matches(command: &str, executable: &str, config: &str) -> Result<bool, String> {
-    let quoted = windows_command(executable, config)?;
-    // MSI quotes both paths; windows-service quotes only arguments containing spaces.
-    // Restrict matching to these two known spellings rather than parse arbitrary shell text.
-    let argument = |value: &str| if value.contains(' ') { format!("\"{value}\"") } else { value.into() };
-    Ok(command == quoted || command == format!("{} --service --config {}", argument(executable), argument(config)))
+    windows_command(executable, config)?;
+    // MSI quotes the executable only when necessary, independently of the quotes
+    // in its authored Arguments. windows-service also quotes each path separately.
+    // Match only exact spellings: unquoted paths are allowed only without spaces,
+    // and no extra arguments or shell parsing are accepted.
+    let spellings = |value: &str| [Some(format!("\"{value}\"")), (!value.contains(' ')).then(|| value.to_owned())];
+    Ok(spellings(executable)
+        .iter()
+        .flatten()
+        .any(|exe| spellings(config).iter().flatten().any(|config| command == format!("{exe} --service --config {config}"))))
 }
 
 #[cfg(any(target_os = "linux", test))]
@@ -130,5 +135,40 @@ mod tests {
             )
             .unwrap()
         );
+    }
+
+    #[test]
+    fn windows_msi_service_without_spaces_keeps_its_quoted_config() {
+        // Real Server 2022/2025 MSI log: InstallServices leaves this executable
+        // unquoted, but our authored Arguments always quote the configuration.
+        let executable = r"D:\a\_temp\pdfcraft-server-3f095f37bddd4f8ba552b2dbded10c96\app\pdfcraft-hot-folder.exe";
+        let config = r"C:\ProgramData\PdfCraft\HotFolder\tasks.json";
+        let registered = format!(r#"{executable} --service --config "{config}""#);
+        assert!(windows_command_matches(&registered, executable, config).unwrap());
+    }
+
+    #[test]
+    fn windows_service_path_quoting_is_independent_and_rejects_other_commands() {
+        for executable in [r"C:\Apps\worker.exe", r"C:\Program Files\PdfCraft\worker.exe", r"C:\Anwendungen\Büro\worker.exe"] {
+            for config in [r"C:\ProgramData\PdfCraft\tasks.json", r"C:\Task Data\tasks.json"] {
+                for quote_exe in [false, true] {
+                    for quote_config in [false, true] {
+                        let exe_arg = if quote_exe { format!("\"{executable}\"") } else { executable.to_owned() };
+                        let config_arg = if quote_config { format!("\"{config}\"") } else { config.to_owned() };
+                        let command = format!("{exe_arg} --service --config {config_arg}");
+                        let valid = (quote_exe || !executable.contains(' ')) && (quote_config || !config.contains(' '));
+                        assert_eq!(windows_command_matches(&command, executable, config).unwrap(), valid, "{command}");
+                        assert!(!windows_command_matches(&format!("{command} --worker"), executable, config).unwrap());
+                    }
+                }
+                let command = windows_command(executable, config).unwrap();
+                assert!(!windows_command_matches(&command.replace("--service", "--once"), executable, config).unwrap());
+                assert!(!windows_command_matches(&command, &format!("{executable}.other"), config).unwrap());
+                assert!(!windows_command_matches(&command, executable, &format!("{config}.other")).unwrap());
+            }
+        }
+        assert!(windows_command_matches("anything", "bad\"exe", r"C:\tasks.json").is_err());
+        assert!(windows_command_matches("anything", r"C:\worker.exe", "bad\nconfig").is_err());
+        assert!(windows_command_matches("anything", r"C:\worker.exe", "C:\\directory\\").is_err());
     }
 }
