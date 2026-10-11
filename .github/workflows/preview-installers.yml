@@ -1,0 +1,118 @@
+name: Preview installers
+
+on:
+  push:
+    branches: [codex/preview-installers]
+    paths:
+      - 'crates/**'
+      - 'apps/**'
+      - 'packaging/**'
+      - 'Cargo.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-installers-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+  PDFCRAFT_BUILD_SHA: ${{ github.sha }}
+  PDFCRAFT_VERSION: 0.6.0-preview.20261011
+  PDFCRAFT_SYSTEM_FONTS: '0'
+
+jobs:
+  windows:
+    name: Windows ${{ matrix.arch }} MSI
+    runs-on: windows-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, target: x86_64-pc-windows-msvc }
+          - { arch: arm64, target: aarch64-pc-windows-msvc }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out approved Japanese fonts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: storytold/craft-fonts
+          ref: 8dcdacd5153e64560d109541a47d806f26f048c0
+          path: craft-fonts
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: preview-windows-${{ matrix.arch }}
+      - name: Identify the preview version
+        shell: bash
+        run: cargo xtask version set "$PDFCRAFT_VERSION"
+      - name: Install WiX
+        shell: pwsh
+        run: dotnet tool install --global wix --version 5.0.2
+      - name: Build and verify unsigned MSI with OCR models
+        shell: pwsh
+        env:
+          CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
+          CRAFT_FONTS_REQUIRED: '1'
+        run: ./packaging/windows/package.ps1 -Arch ${{ matrix.arch }}
+      - name: Compute checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem dist/release/*.msi | ForEach-Object {
+            $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)" | Set-Content -Encoding ascii "$($_.FullName).sha256"
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pdfcraft-preview-windows-${{ matrix.arch }}
+          path: |
+            dist/release/*.msi
+            dist/release/*.sha256
+          retention-days: 14
+          if-no-files-found: error
+
+  macos:
+    name: macOS universal DMG (Intel + Apple Silicon)
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out approved Japanese fonts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: storytold/craft-fonts
+          ref: 8dcdacd5153e64560d109541a47d806f26f048c0
+          path: craft-fonts
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: preview-macos-universal
+      - name: Identify the preview version
+        run: cargo xtask version set "$PDFCRAFT_VERSION"
+      - name: Build and verify ad-hoc signed DMG with OCR models
+        env:
+          CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
+          CRAFT_FONTS_REQUIRED: '1'
+        run: packaging/macos/package.sh --arch universal
+      - name: Verify both architectures and compute checksum
+        run: |
+          lipo -verify_arch arm64 x86_64 target/macos-package/bin/pdfcraft
+          cd dist/release
+          shasum -a 256 *.dmg > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pdfcraft-preview-macos-universal
+          path: |
+            dist/release/*.dmg
+            dist/release/SHA256SUMS.txt
+          retention-days: 14
+          if-no-files-found: error
