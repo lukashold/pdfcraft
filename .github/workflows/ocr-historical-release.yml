@@ -1,0 +1,66 @@
+name: Publish verified historical OCR add-on
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/ocr-model-assets]
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      KRAKEN_COMMIT: 0d07314ba0e6fa31d786bf3f88b20dd93597f591
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.14'
+      - name: Install isolated model-maintenance dependencies
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch==2.14.1+cpu'
+          python -m pip install 'numpy==2.5.4' 'onnx==1.23.2' 'protobuf==7.36.2'
+      - name: Fetch pinned source weights and network architecture
+        run: |
+          mkdir -p kraken_ppocr
+          touch kraken_ppocr/__init__.py
+          for module in backbone heads necks network; do
+            curl --fail --location --retry 3 "https://raw.githubusercontent.com/mittagessen/kraken/$KRAKEN_COMMIT/kraken/lib/ppocr/$module.py" --output "kraken_ppocr/$module.py"
+          done
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('kraken_ppocr/backbone.py')
+          source = path.read_text()
+          assert source.count('h = x.shape[2]') == 1
+          path.write_text(source.replace('h = x.shape[2]', 'h = int(x.shape[2])'))
+          PY
+          curl --fail --location --retry 3 https://zenodo.org/api/records/21788405/files/small.safetensors/content --output small.safetensors
+      - name: Export and verify exact release payload
+        run: |
+          python export_historical.py small.safetensors release
+          cd release
+          printf '%s\n' \
+            'e8de47f398bd4f7943799c6bf84cc1a4093dd24ace8d23ff0a88ddc44011f57e  historical-recognition.onnx' \
+            'dc2070c479e38ccdce553fbfc96af26e6824333dcc969b8855875acd54f85fde  historical-dictionary.json' > SHA256SUMS.txt
+          sha256sum --check SHA256SUMS.txt
+          cp ../MODEL-LICENSE.txt LICENSE.txt
+          cp ../MODEL-NOTICE.txt MODEL-NOTICE.txt
+          sha256sum LICENSE.txt MODEL-NOTICE.txt >> SHA256SUMS.txt
+          cd ..
+          zip -r release/historical-export-source.zip export_historical.py EXPORT-README.txt LICENSE-APACHE LICENSE-MIT kraken_ppocr -x '*/__pycache__/*'
+      - name: Publish optional model resources
+        env:
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! gh release view ocr-historical-v1 >/dev/null 2>&1; then
+            gh release create ocr-historical-v1 --target "$GITHUB_SHA" --title 'Optional historical OCR model v1' --notes-file MODEL-NOTICE.txt --prerelease --draft
+          fi
+          if [ "$(gh release view ocr-historical-v1 --json isDraft --jq .isDraft)" != true ]; then
+            echo 'Refusing to replace a published release'; exit 1
+          fi
+          gh release upload ocr-historical-v1 --clobber release/historical-recognition.onnx release/historical-dictionary.json release/LICENSE.txt release/MODEL-NOTICE.txt release/SHA256SUMS.txt release/historical-export-source.zip
+          gh release edit ocr-historical-v1 --draft=false --prerelease --latest=false
