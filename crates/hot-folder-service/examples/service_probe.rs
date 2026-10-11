@@ -21,6 +21,7 @@ fn main() -> Result<(), String> {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--service" => action = "run".into(),
+            "--initialize-config" => action = "initialize".into(),
             "--config" => config = args.next().map(std::path::PathBuf::from),
             "--service-action" => action = args.next().ok_or("missing action")?,
             "--account" => account = args.next().ok_or("missing account")?,
@@ -31,6 +32,33 @@ fn main() -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|e| e.to_string())?;
     use pdfcraft_hot_folder_service as service;
     match action.as_str() {
+        "initialize" => {
+            let parent = config.parent().ok_or("missing configuration directory")?;
+            let mut directories = std::fs::DirBuilder::new();
+            directories.recursive(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::DirBuilderExt;
+                directories.mode(0o700);
+            }
+            directories.create(parent).map_err(|e| e.to_string())?;
+            let mut options = std::fs::OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                options.mode(0o600);
+            }
+            match options.open(&config) {
+                Ok(mut file) => {
+                    use std::io::Write;
+                    file.write_all(b"{\"tasks\":[]}").map_err(|e| e.to_string())?;
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+                Err(e) => return Err(e.to_string()),
+            }
+            return Ok(());
+        }
         "run" => return service::run(&config, worker),
         "install" => service::install(&executable, &config, &account)?,
         "uninstall" => service::uninstall(&executable, &config)?,

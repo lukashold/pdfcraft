@@ -8,6 +8,8 @@ on:
       - 'crates/hot-folder-service/**'
       - 'packaging/service-tests/**'
       - 'packaging/windows/**'
+      - 'packaging/macos/**'
+      - 'packaging/linux/**'
       - '.github/workflows/hot-folder-services.yml'
 permissions:
   contents: read
@@ -38,6 +40,13 @@ jobs:
       - if: runner.os == 'Windows'
         shell: pwsh
         run: packaging/service-tests/windows-msi.ps1
+      - if: runner.os == 'macOS'
+        run: bash packaging/service-tests/macos-pkg.sh
+      - if: runner.os == 'Linux'
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/nfpm.deb" https://github.com/goreleaser/nfpm/releases/download/v2.47.0/nfpm_2.47.0_amd64.deb
+          sudo dpkg -i "$RUNNER_TEMP/nfpm.deb"
+          bash packaging/service-tests/linux-deb.sh
       - if: always() && runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
