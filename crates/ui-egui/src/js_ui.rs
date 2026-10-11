@@ -277,6 +277,19 @@ pub(crate) fn preferences_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tok
             .color(t.text_muted),
     );
     ui.add_space(8.0);
+    ui.horizontal(|ui| {
+        use crate::touch::TouchMode;
+        ui.label(tl!("Touch and pen"));
+        for (mode, label) in [(TouchMode::Auto, "Auto"), (TouchMode::On, "On"), (TouchMode::Off, "Off")] {
+            ui.selectable_value(&mut app.touch_mode, mode, tl!(label));
+        }
+    });
+    ui.label(
+        egui::RichText::new(tl!("Larger drawing tools. Use two fingers to move or zoom; use Hand to move with one finger."))
+            .small()
+            .color(t.text_muted),
+    );
+    ui.add_space(8.0);
     ui.label(egui::RichText::new(tl!("Documents and view")).font(theme::semibold(13.0)));
     ui.horizontal(|ui| {
         ui.label(tl!("Default workspace mode"));

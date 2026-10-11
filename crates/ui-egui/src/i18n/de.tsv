@@ -2196,3 +2196,7 @@ key	Space	Leertaste
 	Resize panel window	Größe des Bereichsfensters ändern
 	Tools	Werkzeuge
 	Inspector	Inspektor
+
+# Touch and pen controls
+	Touch and pen	Touch und Stift
+	Larger drawing tools. Use two fingers to move or zoom; use Hand to move with one finger.	Größere Zeichenwerkzeuge. Mit zwei Fingern verschieben oder zoomen; mit dem Handwerkzeug mit einem Finger verschieben.

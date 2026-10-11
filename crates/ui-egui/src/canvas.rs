@@ -1735,6 +1735,7 @@ pub fn shortcuts(view: &mut DocView, ctx: &egui::Context) {
 const KEY_SCROLL_LINE: f32 = 40.0;
 
 pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
+    crate::touch::toolbar(ui, app);
     let t = Tokens::get(ui.ctx());
     // Keyboard scrolling applies to this frame's page view only, never later.
     let key_scroll = std::mem::take(&mut app.views[index].key_scroll);
@@ -1787,10 +1788,10 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     view.fit_zoom(info);
 
     // Pinch / ctrl+scroll zoom, anchored on the current page.
-    let zoom_delta = ui.input(|i| i.zoom_delta());
+    let zoom_delta = app.touch_input.zoom.unwrap_or_else(|| ui.input(|i| i.zoom_delta()));
     if (zoom_delta - 1.0).abs() > 0.001 && ui.rect_contains_pointer(avail) {
         let z = view.zoom * zoom_delta;
-        match ui.input(|i| i.pointer.hover_pos()) {
+        match app.touch_input.center.or_else(|| ui.input(|i| i.pointer.hover_pos())) {
             Some(p) => view.zoom_at(z, p),
             None => view.set_zoom(z),
         }
@@ -1886,7 +1887,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     };
 
     let mut scroll = egui::ScrollArea::both().auto_shrink([false, false]).scroll_source(egui::scroll_area::ScrollSource {
-        drag: if middle_gesture {
+        drag: if middle_gesture || app.touch_input.blocked || !matches!(app.quick_tool, QuickTool::Select | QuickTool::Hand) {
             egui::scroll_area::DragScroll::Never
         } else if app.quick_tool == QuickTool::Hand {
             egui::scroll_area::DragScroll::Always
@@ -1997,7 +1998,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     let out = scroll.show_viewport(ui, |ui, viewport| {
         // egui's drag responses accept every pointer button. Keep a wheel gesture from also
         // selecting text, drawing a mark, or panning with the Hand tool.
-        if middle_gesture {
+        if middle_gesture || app.touch_input.blocked {
             let opacity = ui.opacity();
             ui.disable();
             // Only interactions pause; the document must keep its original colours.
@@ -2005,7 +2006,12 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         }
         // Middle-button auto-scroll, the keyboard and precise touchpad input (#759); positive y
         // moves the content down. All three scroll without easing, unlike egui's wheel default.
-        let delta = auto_delta - vec2(0.0, key_scroll) + precise_scroll;
+        let touch_delta = if unobstructed && app.touch_input.origin.is_some_and(|origin| avail.contains(origin)) {
+            app.touch_input.translation
+        } else {
+            Vec2::ZERO
+        };
+        let delta = auto_delta - vec2(0.0, key_scroll) + precise_scroll + touch_delta;
         if delta != Vec2::ZERO {
             ui.scroll_with_delta_animation(delta, egui::style::ScrollAnimation::none());
         }
@@ -2808,7 +2814,9 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     if let Some((name, action)) = app.views[index].forms.button.take() {
         run_button(app, index, &name, action);
     }
-    quick_bar(app, avail, ui);
+    if !app.touch_active() {
+        quick_bar(app, avail, ui);
+    }
 }
 
 /// Run a push button's action (the ones that need no JavaScript engine).

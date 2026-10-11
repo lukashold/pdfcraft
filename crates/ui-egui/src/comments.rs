@@ -580,10 +580,28 @@ fn resized(r: Rect, (hx, hy): (i8, i8), d: egui::Vec2, aspect_ratio: Option<f32>
     Rect::from_two_pos(r.min, r.max)
 }
 
+impl CommentView {
+    pub(crate) fn cancel_pointer_gesture(&mut self) {
+        self.gesture = None;
+        self.cancelled_drag = true;
+    }
+}
+
 /// Comment input on one page, before text selection runs. Returns `true` when the pointer
 /// gesture belongs to commenting (text selection must ignore it).
 pub(crate) fn page_input(ui: &egui::Ui, resp: &egui::Response, cx: &PageCx<'_>, view: &mut DocView) -> bool {
-    let pointer = ui.input(|i| i.pointer.hover_pos());
+    let pointer = ui.input(|i| {
+        i.events
+            .iter()
+            .find_map(|event| {
+                if let egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed: false, .. } = event {
+                    Some(*pos)
+                } else {
+                    None
+                }
+            })
+            .or_else(|| i.pointer.hover_pos())
+    });
     let origin = ui.input(|i| i.pointer.press_origin());
     let page_rect = cx.xf.rect;
     let pressed_here = origin.is_some_and(|o| page_rect.contains(o));
@@ -612,7 +630,7 @@ pub(crate) fn page_input(ui: &egui::Ui, resp: &egui::Response, cx: &PageCx<'_>, 
             if over_page {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::Crosshair);
             }
-            if resp.drag_started()
+            if (resp.drag_started_by(egui::PointerButton::Primary) || (resp.is_pointer_button_down_on() && ui.input(|i| i.pointer.primary_pressed())))
                 && pressed_here
                 && let Some(o) = origin
             {
@@ -626,16 +644,41 @@ pub(crate) fn page_input(ui: &egui::Ui, resp: &egui::Response, cx: &PageCx<'_>, 
                 let p = clamp_to(page_rect, p);
                 let u = cx.to_user(p);
                 if matches!(*tool, CommentTool::Ink | CommentTool::Eraser) {
-                    let last = points.last().map(|l| cx.to_screen(*l)).unwrap_or(p);
-                    if last.distance(p) >= 1.5 {
-                        points.push(u);
-                    }
+                    // Preserve every delivered sample, including multiple moves in one frame.
+                    // Start at this frame's press, never at a hover before the press.
+                    ui.input(|input| {
+                        let start = input
+                            .events
+                            .iter()
+                            .rposition(|event| {
+                                matches!(event, egui::Event::PointerButton { button: egui::PointerButton::Primary, pressed: true, .. })
+                            })
+                            .unwrap_or(0);
+                        for event in input.events.iter().skip(start) {
+                            if matches!(event, egui::Event::PointerButton { button: egui::PointerButton::Primary, pressed: false, .. }) {
+                                break;
+                            }
+                            if let egui::Event::PointerMoved(sample) = event {
+                                append_ink_sample(points, cx, clamp_to(page_rect, *sample));
+                            }
+                        }
+                    });
+                    append_ink_sample(points, cx, p);
                 } else {
                     points.truncate(1);
                     points.push(u);
                 }
             }
-            if resp.drag_stopped()
+            if tool == CommentTool::Ink
+                && resp.clicked()
+                && cv.gesture.is_none()
+                && let Some(p) = pointer.filter(|p| page_rect.contains(*p))
+            {
+                cv.gesture = Some(Gesture::Draw { page: cx.page, tool, points: vec![cx.to_user(p)] });
+            }
+            // A short stroke can press, move and release before egui assigns a drag owner.
+            // Its already-started page gesture must still commit at the primary release.
+            if (resp.drag_stopped_by(egui::PointerButton::Primary) || resp.clicked() || ui.input(|i| i.pointer.primary_released()))
                 && let Some(Gesture::Draw { page, tool, points }) = cv.gesture.clone()
                 && page == cx.page
             {
@@ -1060,6 +1103,23 @@ fn paint_gesture(painter: &egui::Painter, cx: &PageCx<'_>, view: &DocView) {
     }
 }
 
+/// Bound long strokes without losing the latest pen position. Existing points are thinned only
+/// when the cap is reached; the next half of the buffer is available to new samples.
+fn append_ink_sample(points: &mut Vec<[f64; 2]>, cx: &PageCx<'_>, sample: Pos2) {
+    if !sample.x.is_finite() || !sample.y.is_finite() || points.last().is_some_and(|last| cx.to_screen(*last).distance(sample) < 0.25) {
+        return;
+    }
+    if points.len() >= 65_536 {
+        let mut index = 0;
+        points.retain(|_| {
+            let keep = index % 2 == 0;
+            index += 1;
+            keep
+        });
+    }
+    points.push(cx.to_user(sample));
+}
+
 /// The shape a finished drawing gesture makes (`None` if it is too small to mean anything).
 fn drawn_shape(tool: CommentTool, points: &[[f64; 2]]) -> Option<Shape> {
     let (first, last) = (*points.first()?, *points.last()?);
@@ -1067,7 +1127,8 @@ fn drawn_shape(tool: CommentTool, points: &[[f64; 2]]) -> Option<Shape> {
     let rect = [first[0].min(last[0]), first[1].min(last[1]), first[0].max(last[0]), first[1].max(last[1])];
     let big = rect[2] - rect[0] >= 2.0 && rect[3] - rect[1] >= 2.0;
     match tool {
-        CommentTool::Ink if points.len() >= 2 => Some(Shape::Ink { strokes: vec![points.to_vec()] }),
+        // A pen tap is a dot. Two coincident points use the normal PDF round line caps.
+        CommentTool::Ink => Some(Shape::Ink { strokes: vec![if points.len() == 1 { vec![first, first] } else { points.to_vec() }] }),
         CommentTool::Line | CommentTool::Arrow if far => Some(Shape::Line {
             from: first,
             to: last,
@@ -1124,6 +1185,7 @@ pub(crate) fn composer(ctx: &egui::Context, view: &mut DocView, info: &DocInfo, 
     let cx = PageCx { page, xf: &xf, info, tool: QuickTool::Select, prefs, allowed: true, hidden: false };
     let anchor = cx.to_screen(c.at);
     let t = Tokens::get(ctx);
+    let target = crate::touch::control_size(ctx, 0.0);
     let mut post = false;
     let mut cancel = false;
     let c = view.comments.composer.as_mut()?;
@@ -1167,14 +1229,17 @@ pub(crate) fn composer(ctx: &egui::Context, view: &mut DocView, info: &DocInfo, 
                     if ui
                         .add_enabled(
                             can_post,
-                            egui::Button::new(egui::RichText::new(tl!("Post")).color(Color32::WHITE)).fill(t.accent).corner_radius(14),
+                            egui::Button::new(egui::RichText::new(tl!("Post")).color(Color32::WHITE))
+                                .fill(t.accent)
+                                .corner_radius(14)
+                                .min_size(vec2(target, target)),
                         )
                         .clicked()
                         || (enter && can_post)
                     {
                         post = true;
                     }
-                    if ui.add(egui::Button::new(tl!("Cancel")).corner_radius(14)).clicked() {
+                    if ui.add(egui::Button::new(tl!("Cancel")).corner_radius(14).min_size(vec2(target, target))).clicked() {
                         cancel = true;
                     }
                 });
@@ -1368,15 +1433,18 @@ pub enum CanvasAction {
 /// A grid of colour swatches; returns the one clicked.
 pub fn swatch_grid(ui: &mut egui::Ui, current: Option<Rgb>) -> Option<Rgb> {
     let mut picked = None;
+    let size = crate::touch::control_size(ui.ctx(), 22.0);
+    let radius = (size * 0.5 - 2.0).min(16.0);
     egui::Grid::new(ui.id().with("swatches")).spacing(vec2(6.0, 6.0)).show(ui, |ui| {
         for (i, (name, c)) in SWATCHES.iter().enumerate() {
-            let (r, resp) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::click());
+            let (r, resp) = ui.allocate_exact_size(vec2(size, size), Sense::click());
             let on = current.is_some_and(|cur| cur.iter().zip(c).all(|(a, b)| (a - b).abs() < 0.02));
-            ui.painter().circle_filled(r.center(), 9.0, color32(*c));
-            ui.painter().circle_stroke(r.center(), 9.0, Stroke::new(1.0, Color32::from_black_alpha(40)));
+            ui.painter().circle_filled(r.center(), radius, color32(*c));
+            ui.painter().circle_stroke(r.center(), radius, Stroke::new(1.0, Color32::from_black_alpha(40)));
             if on || resp.hovered() {
-                ui.painter().circle_stroke(r.center(), 11.0, Stroke::new(1.5, SELECT_BLUE));
+                ui.painter().circle_stroke(r.center(), radius + 2.0, Stroke::new(1.5, SELECT_BLUE));
             }
+            resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::RadioButton, ui.is_enabled(), on, tl!(name)));
             if resp.on_hover_text(tl!(name)).clicked() {
                 picked = Some(*c);
             }
@@ -1393,7 +1461,8 @@ pub fn fill_picker(ui: &mut egui::Ui, current: Option<Rgb>) -> Option<Option<Rgb
     let mut picked = None;
     ui.push_id("fill-picker", |ui| {
         ui.vertical(|ui| {
-            if ui.selectable_label(current.is_none(), tl!("No fill")).clicked() {
+            let target = crate::touch::control_size(ui.ctx(), 0.0);
+            if ui.add(egui::Button::selectable(current.is_none(), tl!("No fill")).min_size(vec2(target, target))).clicked() {
                 picked = Some(None);
             }
             if let Some(c) = swatch_grid(ui, current) {
@@ -1406,13 +1475,15 @@ pub fn fill_picker(ui: &mut egui::Ui, current: Option<Rgb>) -> Option<Option<Rgb
 
 /// The comment tools' extra quick-bar controls: pin, colour, fill, opacity and thickness.
 pub(crate) fn quick_bar_controls(ui: &mut egui::Ui, tool: CommentTool, prefs: &mut CommentPrefs) {
+    let size = crate::touch::control_size(ui.ctx(), 32.0);
     let style = prefs.style(tool);
-    if icons::button(ui, "pin", 32.0, prefs.pinned, if prefs.pinned { tl!("Keep tool selected: on") } else { tl!("Keep tool selected") }).clicked() {
+    if icons::button(ui, "pin", size, prefs.pinned, if prefs.pinned { tl!("Keep tool selected: on") } else { tl!("Keep tool selected") }).clicked() {
         prefs.pinned = !prefs.pinned;
     }
-    let (r, resp) = ui.allocate_exact_size(vec2(32.0, 32.0), Sense::click());
+    let (r, resp) = ui.allocate_exact_size(vec2(size, size), Sense::click());
     ui.painter().circle_filled(r.center(), 9.0, color32(style.color));
     ui.painter().circle_stroke(r.center(), 9.0, Stroke::new(1.0, Color32::from_black_alpha(50)));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), tl!("Colour")));
     let resp = resp.on_hover_text(tl!("Colour"));
     egui::Popup::menu(&resp).align(egui::RectAlign::RIGHT_START).show(|ui| {
         if let Some(c) = swatch_grid(ui, Some(style.color)) {
@@ -1430,7 +1501,7 @@ pub(crate) fn quick_bar_controls(ui: &mut egui::Ui, tool: CommentTool, prefs: &m
             }
         });
     }
-    let resp = icons::button(ui, "blend", 32.0, false, tl!("Opacity"));
+    let resp = icons::button(ui, "blend", size, false, tl!("Opacity"));
     egui::Popup::menu(&resp).align(egui::RectAlign::RIGHT_START).close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside).show(|ui| {
         ui.set_min_width(180.0);
         let mut percent = (style.opacity * 100.0).round();
@@ -1440,7 +1511,7 @@ pub(crate) fn quick_bar_controls(ui: &mut egui::Ui, tool: CommentTool, prefs: &m
         }
     });
     if tool.has_width() {
-        let resp = icons::button(ui, "sliders-horizontal", 32.0, false, tl!("Line thickness"));
+        let resp = icons::button(ui, "sliders-horizontal", size, false, tl!("Line thickness"));
         egui::Popup::menu(&resp).align(egui::RectAlign::RIGHT_START).close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside).show(|ui| {
             ui.set_min_width(180.0);
             let mut w = style.width;
@@ -1455,7 +1526,8 @@ pub(crate) fn quick_bar_controls(ui: &mut egui::Ui, tool: CommentTool, prefs: &m
 /// The quick bar's fill button: a filled square in the fill colour, or a crossed-out outline
 /// for no fill.
 fn fill_button(ui: &mut egui::Ui, fill: Option<Rgb>) -> egui::Response {
-    let (r, resp) = ui.allocate_exact_size(vec2(32.0, 32.0), Sense::click());
+    let size = crate::touch::control_size(ui.ctx(), 32.0);
+    let (r, resp) = ui.allocate_exact_size(vec2(size, size), Sense::click());
     let sq = Rect::from_center_size(r.center(), vec2(16.0, 16.0));
     let edge = Stroke::new(1.0, Color32::from_black_alpha(90));
     match fill {
@@ -1528,7 +1600,7 @@ mod tests {
     fn drawn_shapes_ignore_slips() {
         assert_eq!(drawn_shape(CommentTool::Rectangle, &[[0.0, 0.0], [1.0, 1.0]]), None);
         assert_eq!(drawn_shape(CommentTool::Rectangle, &[[10.0, 0.0], [0.0, 10.0]]), Some(Shape::Rectangle { rect: [0.0, 0.0, 10.0, 10.0] }));
-        assert_eq!(drawn_shape(CommentTool::Ink, &[[0.0, 0.0]]), None);
+        assert_eq!(drawn_shape(CommentTool::Ink, &[[0.0, 0.0]]), Some(Shape::Ink { strokes: vec![vec![[0.0, 0.0], [0.0, 0.0]]] }));
         assert!(matches!(
             drawn_shape(CommentTool::Arrow, &[[0.0, 0.0], [5.0, 0.0]]),
             Some(Shape::Line { start: LineEnding::None, end: LineEnding::OpenArrow, .. })

@@ -2109,3 +2109,7 @@ key	Space	Пробел
 	Resize panel window	Изменить размер окна панели
 	Tools	Инструменты
 	Inspector	Инспектор
+
+# Touch and pen controls
+	Touch and pen	Сенсорный ввод и перо
+	Larger drawing tools. Use two fingers to move or zoom; use Hand to move with one finger.	Крупные инструменты рисования. Двумя пальцами перемещайте страницу или меняйте масштаб; инструментом «Рука» перемещайте одним пальцем.

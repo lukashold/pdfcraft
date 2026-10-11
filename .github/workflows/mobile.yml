@@ -3,7 +3,7 @@ name: Mobile packages
 on:
   workflow_dispatch:
   push:
-    branches: [codex/mobile-apps]
+    branches: [codex/mobile-apps, codex/mobile-touch-preview]
   pull_request:
     paths:
       - packaging/mobile/**
@@ -74,6 +74,8 @@ jobs:
           cargo fmt --all -- --check
           cargo test --locked -p pdfcraft-ui-egui --lib host_files::tests
           cargo test --locked -p pdfcraft-ui-egui --lib i18n::
+          cargo test --locked -p pdfcraft-ui-egui --lib touch::
+          cargo test --locked -p pdfcraft-ui-egui --test touch_controls --test touch_header --test touch_phone
           cargo test --locked -p xtask mobile::
           cargo xtask assets
           cargo xtask layers
@@ -110,7 +112,6 @@ jobs:
           java-version: "17"
       - uses: android-actions/setup-android@v3
         with:
-          # The action already installs cmdline-tools; its legacy 'tools' default is obsolete.
           packages: platform-tools
       - name: Install Android SDK and NDK
         run: |

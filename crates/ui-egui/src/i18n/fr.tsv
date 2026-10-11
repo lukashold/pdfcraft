@@ -2196,3 +2196,7 @@ key	Space	Espace
 	Resize panel window	Redimensionner la fenêtre du panneau
 	Tools	Outils
 	Inspector	Inspecteur
+
+# Touch and pen controls
+	Touch and pen	Tactile et stylet
+	Larger drawing tools. Use two fingers to move or zoom; use Hand to move with one finger.	Outils de dessin agrandis. Utilisez deux doigts pour déplacer ou zoomer, ou l’outil Main pour déplacer avec un doigt.

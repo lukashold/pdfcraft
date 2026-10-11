@@ -2196,3 +2196,7 @@ key	Space	スペース
 	Resize panel window	パネルウィンドウのサイズを変更
 	Tools	ツール
 	Inspector	インスペクター
+
+# Touch and pen controls
+	Touch and pen	タッチとペン
+	Larger drawing tools. Use two fingers to move or zoom; use Hand to move with one finger.	描画ツールを大きく表示します。2本指で移動やズーム、手のひらツールで1本指による移動ができます。
