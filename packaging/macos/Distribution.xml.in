@@ -4,7 +4,7 @@
   <options customize="always" require-scripts="false" rootVolumeOnly="true"/>
   <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true"/>
   <choices-outline><line choice="pdfcraft"/><line choice="hot-folder"/></choices-outline>
-  <choice id="pdfcraft" title="PdfCraft" start_selected="true" enabled="false">
+  <choice id="pdfcraft" title="PdfCraft" description="Install the PdfCraft application for working with PDF documents." start_selected="true" enabled="false">
     <pkg-ref id="ai.storyteller.pdfcraft.pkg"/>
   </choice>
   <choice id="hot-folder" title="PdfCraft Hot Folder" start_selected="false"

@@ -1,0 +1,44 @@
+{
+  "en": {
+    "culture": "en-US",
+    "language": 1033,
+    "codepage": 1252,
+    "primary": 9
+  },
+  "de": {
+    "culture": "de-DE",
+    "language": 1031,
+    "codepage": 1252,
+    "primary": 7
+  },
+  "fr": {
+    "culture": "fr-FR",
+    "language": 1036,
+    "codepage": 1252,
+    "primary": 12
+  },
+  "es": {
+    "culture": "es-ES",
+    "language": 3082,
+    "codepage": 1252,
+    "primary": 10
+  },
+  "nl": {
+    "culture": "nl-NL",
+    "language": 1043,
+    "codepage": 1252,
+    "primary": 19
+  },
+  "it": {
+    "culture": "it-IT",
+    "language": 1040,
+    "codepage": 1252,
+    "primary": 16
+  },
+  "hu": {
+    "culture": "hu-HU",
+    "language": 1038,
+    "codepage": 1250,
+    "primary": 14
+  }
+}

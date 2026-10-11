@@ -232,7 +232,7 @@ pub fn stage(
         let mut source = backend(config, root, &control, store)?;
         let mut report = stage_with(source.as_mut(), config, &input, &mut journal, &control)?;
         if let SourceConfig::Project(project) = config {
-            project::validate_and_order(project, root, &journal, &mut report)?;
+            project::validate_and_order(project, &input, root, &journal, &mut report)?;
         }
         Ok(report)
     })
@@ -263,6 +263,14 @@ fn stage_with(
             return Err("source path is unsafe or source exceeds the 512 MiB per-file limit".into());
         }
         let source_id = hash(format!("{}\n{}\n{}\n{}", journal.config_hash, remote.key, remote.revision, remote.size).as_bytes());
+        if !journal.records.contains_key(&source_id)
+            && let Some(record) = archived_record(input, &journal.config_hash, &source_id)?
+        {
+            if record.acknowledged {
+                continue;
+            }
+            return Err("source history contains an unfinished archive record".into());
+        }
         if journal.records.get(&source_id).is_some_and(|record| record.acknowledged || record.ready) {
             continue;
         }
@@ -283,7 +291,7 @@ fn stage_with(
             }
         }
         if journal.records.len() >= MAX_ITEMS {
-            return Err("source journal reached 10000 versions; archive the task and create a new task".into());
+            return Err("source queue has 10000 unfinished versions; finish or resolve pending acknowledgements first".into());
         }
         let name = remote.relative.file_name().and_then(|name| name.to_str()).ok_or("source filename is not valid UTF-8")?;
         let staged_relative = PathBuf::from(format!("{}-{}", source_id.get(..24).ok_or("invalid source ID")?, safe_filename(name)));
@@ -356,6 +364,11 @@ pub fn acknowledge(
         let mut journal = read_journal(&input, config)?;
         let control = Control::new(should_stop);
         control.check()?;
+        if !journal.records.contains_key(&item.source_id)
+            && let Some(record) = archived_record(&input, &journal.config_hash, &item.source_id)?
+        {
+            journal.records.insert(item.source_id.clone(), record);
+        }
         let record = journal.records.get_mut(&item.source_id).ok_or("source receipt is absent from the durable journal")?;
         if record.source != *item || confirmed_sha256 != record.source.sha256 {
             return Err("output receipt does not match this source version; original retained".into());
@@ -368,7 +381,7 @@ pub fn acknowledge(
         }
         record.ready = true;
         let group = record.remote.group.clone();
-        write_journal(&input, &journal)?;
+        write_journal(&input, &mut journal)?;
         let records = journal
             .records
             .values()
@@ -389,7 +402,7 @@ pub fn acknowledge(
                 record.acknowledged = true;
             }
         }
-        write_journal(&input, &journal)
+        write_journal(&input, &mut journal)
     })
 }
 
@@ -540,11 +553,15 @@ fn read_journal(input: &Path, config: &SourceConfig) -> Result<Journal, String> 
     let path = input.join(STATE_FILE);
     plain_file(&path)?;
     let config_hash = hash(&serde_json::to_vec(config).map_err(io_error)?);
-    if !path.exists() {
-        return Ok(Journal { config_hash, ..Default::default() });
-    }
-    let bytes = read_bounded(&path, MAX_JSON)?;
-    let journal: Journal = serde_json::from_slice(&bytes).map_err(|_| "source journal is malformed; originals retained".to_owned())?;
+    let journal: Journal = if let Some(pending) = crate::hot_folder::journal::pending(&path)? {
+        pending
+    } else {
+        if !path.exists() {
+            return Ok(Journal { config_hash, ..Default::default() });
+        }
+        let bytes = read_bounded(&path, MAX_JSON)?;
+        serde_json::from_slice(&bytes).map_err(|_| "source journal is malformed; originals retained".to_owned())?
+    };
     if journal.config_hash != config_hash {
         return Err("source settings changed; choose a fresh staging inbox to avoid applying receipts to another source".into());
     }
@@ -552,25 +569,64 @@ fn read_journal(input: &Path, config: &SourceConfig) -> Result<Journal, String> 
         return Err("source journal exceeds 10000 records".into());
     }
     for (id, record) in &journal.records {
-        if id.len() != 64
-            || !id.bytes().all(|byte| byte.is_ascii_hexdigit())
-            || id != &record.source.source_id
-            || id != &hash(format!("{}\n{}\n{}\n{}", journal.config_hash, record.remote.key, record.remote.revision, record.remote.size).as_bytes())
-            || !relative_ok(&record.source.staged_relative)
-            || record.source.staged_relative.components().count() != 1
-            || record.source.sha256.len() != 64
-            || !record.source.sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
-            || !relative_ok(&record.source.relative)
-            || record.source.relative != record.remote.relative
-            || record.remote.size == 0
-            || record.remote.size > MAX_FILE
-        {
-            return Err("source journal contains an invalid receipt path or hash".into());
-        }
+        validate_record(id, record, &journal.config_hash)?;
     }
     Ok(journal)
 }
-fn write_journal(input: &Path, journal: &Journal) -> Result<(), String> {
+fn validate_record(id: &str, record: &Record, config_hash: &str) -> Result<(), String> {
+    if id.len() != 64
+        || !id.bytes().all(|byte| byte.is_ascii_hexdigit())
+        || id != record.source.source_id
+        || id != hash(format!("{}\n{}\n{}\n{}", config_hash, record.remote.key, record.remote.revision, record.remote.size).as_bytes())
+        || !relative_ok(&record.source.staged_relative)
+        || record.source.staged_relative.components().count() != 1
+        || record.source.sha256.len() != 64
+        || !record.source.sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+        || !relative_ok(&record.source.relative)
+        || record.source.relative != record.remote.relative
+        || record.remote.size == 0
+        || record.remote.size > MAX_FILE
+    {
+        return Err("source journal contains an invalid receipt path or hash".into());
+    }
+    Ok(())
+}
+
+fn archived_record(input: &Path, config_hash: &str, key: &str) -> Result<Option<Record>, String> {
+    let record: Option<Record> = crate::hot_folder::journal::read(&input.join(STATE_FILE), "records", key)?;
+    if let Some(record) = &record {
+        validate_record(key, record, config_hash)?;
+    }
+    Ok(record)
+}
+
+fn archived_relative(input: &Path, config_hash: &str, relative: &Path) -> Result<Option<Record>, String> {
+    let record: Option<Record> =
+        crate::hot_folder::journal::read(&input.join(STATE_FILE), "paths", &format!("{config_hash}:{}", relative.display()))?;
+    if let Some(record) = &record {
+        validate_record(&record.source.source_id, record, config_hash)?;
+    }
+    Ok(record)
+}
+
+fn write_journal(input: &Path, journal: &mut Journal) -> Result<(), String> {
+    let completed: Vec<_> = journal.records.iter().filter(|(_, record)| record.acknowledged).map(|(key, _)| key.clone()).collect();
+    let count = completed.len().saturating_sub(256);
+    let target = input.join(STATE_FILE);
+    if count > 0 {
+        crate::hot_folder::journal::begin(&target, journal)?;
+    }
+    for key in completed.into_iter().take(count) {
+        let record = journal.records.get(&key).ok_or("source history changed during compaction")?;
+        crate::hot_folder::journal::write(&input.join(STATE_FILE), "records", &key, record)?;
+        crate::hot_folder::journal::write(
+            &input.join(STATE_FILE),
+            "paths",
+            &format!("{}:{}", journal.config_hash, record.remote.relative.display()),
+            record,
+        )?;
+        journal.records.remove(&key);
+    }
     let target = input.join(STATE_FILE);
     plain_file(&target)?;
     let bytes = serde_json::to_vec(journal).map_err(io_error)?;
@@ -580,7 +636,8 @@ fn write_journal(input: &Path, journal: &Journal) -> Result<(), String> {
     let mut temporary = tempfile::Builder::new().prefix(".pdfcraft-source-state-").tempfile_in(input).map_err(io_error)?;
     temporary.write_all(&bytes).and_then(|_| temporary.as_file().sync_all()).map_err(io_error)?;
     temporary.persist(&target).map_err(|error| io_error(error.error))?;
-    sync_directory(input)
+    sync_directory(input)?;
+    crate::hot_folder::journal::finish(&target)
 }
 
 /// A synced temporary file does not make its renamed directory entry durable on Unix.
@@ -768,6 +825,55 @@ mod tests {
         assert_eq!(second.items.len(), 1);
         assert!(!second.has_more);
         assert_eq!(second.pending_acknowledgements.len(), 128);
+    }
+    #[test]
+    fn completed_remote_history_rolls_over_and_still_deduplicates_without_downloading() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = SourceConfig::Local;
+        let mut journal = read_journal(dir.path(), &config).unwrap();
+        let mut fake = Fake { count: 300, fail: false };
+        let control = Control::new(&|| false);
+        for _ in 0..3 {
+            let report = stage_with(&mut fake, &config, dir.path(), &mut journal, &control).unwrap();
+            assert!(!report.items.is_empty());
+            for item in report.items {
+                let record = journal.records.get_mut(&item.source_id).unwrap();
+                record.ready = true;
+                record.acknowledged = true;
+                fs::remove_file(dir.path().join(&item.staged_relative)).unwrap();
+            }
+            write_journal(dir.path(), &mut journal).unwrap();
+        }
+        assert_eq!(journal.records.len(), 256);
+        let mut restarted = read_journal(dir.path(), &config).unwrap();
+        fake.fail = true; // Any attempted download now fails this assertion.
+        assert!(stage_with(&mut fake, &config, dir.path(), &mut restarted, &control).unwrap().items.is_empty());
+    }
+
+    #[test]
+    fn archived_project_receipts_allow_deleted_originals_but_reject_modified_binding() {
+        let (root, config, inbox, _) = fixture(SourceAction::Delete);
+        let store = CredentialStore::OsVault;
+        let report = stage(&config, &inbox, Some(root.path()), &|| false, &store).unwrap();
+        let item = &report.items[0];
+        acknowledge(&config, &inbox, item, &item.sha256, Some(root.path()), &|| false, &store).unwrap();
+        let mut journal = read_journal(&inbox, &config).unwrap();
+        let record = journal.records.remove(&item.source_id).unwrap();
+        crate::hot_folder::journal::write(&inbox.join(STATE_FILE), "records", &item.source_id, &record).unwrap();
+        crate::hot_folder::journal::write(
+            &inbox.join(STATE_FILE),
+            "paths",
+            &format!("{}:{}", journal.config_hash, record.remote.relative.display()),
+            &record,
+        )
+        .unwrap();
+        write_journal(&inbox, &mut journal).unwrap();
+        assert_eq!(stage(&config, &inbox, Some(root.path()), &|| false, &store).unwrap().items.len(), 1);
+        acknowledge(&config, &inbox, item, &item.sha256, Some(root.path()), &|| false, &store).unwrap();
+        let mut forged = record;
+        forged.remote.key.push_str("changed");
+        crate::hot_folder::journal::write(&inbox.join(STATE_FILE), "records", &item.source_id, &forged).unwrap();
+        assert!(acknowledge(&config, &inbox, item, &item.sha256, Some(root.path()), &|| false, &store).is_err());
     }
     #[test]
     fn task_json_and_debug_never_contain_credentials() {

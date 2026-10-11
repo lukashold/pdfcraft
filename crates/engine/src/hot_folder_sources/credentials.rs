@@ -246,20 +246,39 @@ fn windows_private(path: &Path, directory: bool) -> Result<(), String> {
         .as_os_str()
         .security_descriptor(SecurityInformation::Dacl | SecurityInformation::Owner)
         .map_err(|_| "cannot inspect Windows credential ACL; run provisioning as administrator")?;
-    windows_descriptor_private(&descriptor, directory)
+    let account = windows_service_account_sid();
+    windows_descriptor_private(&descriptor, directory, account.as_deref())
 }
 
 #[cfg(windows)]
-fn windows_descriptor_private(descriptor: &windows_permissions::SecurityDescriptor, directory: bool) -> Result<(), String> {
+fn windows_service_account_sid() -> Option<windows_permissions::LocalBox<windows_permissions::Sid>> {
+    use windows_service::{service::ServiceAccess, service_manager::*};
+    // Trust only SCM's administrator-controlled Log On identity, never a SID in
+    // task JSON or an arbitrary owner. Domain lookup runs inside the bounded child.
+    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT).ok()?;
+    let account = manager.open_service("PdfCraftHotFolder", ServiceAccess::QUERY_CONFIG).ok()?.query_config().ok()?.account_name?;
+    let name = account.to_str()?;
+    let (_, sid, _) = winsafe::LookupAccountName(None, name.strip_prefix(".\\").unwrap_or(name)).ok()?;
+    winsafe::ConvertSidToStringSid(&sid).ok()?.parse().ok()
+}
+
+#[cfg(windows)]
+fn windows_descriptor_private(
+    descriptor: &windows_permissions::SecurityDescriptor,
+    directory: bool,
+    service_account: Option<&windows_permissions::Sid>,
+) -> Result<(), String> {
     use windows_permissions::constants::AceType;
     use windows_permissions::{LocalBox, Sid};
-    let allowed: Vec<LocalBox<Sid>> = ["S-1-5-18", "S-1-5-32-544", "S-1-5-19"]
+    // NT SERVICE\PdfCraftHotFolder is stable across service-account changes.
+    let allowed: Vec<LocalBox<Sid>> = ["S-1-5-18", "S-1-5-32-544", "S-1-5-19", "S-1-5-80-4013549229-3107762393-4025766903-2826249871-1347187068"]
         .iter()
         .map(|sid| sid.parse())
         .collect::<Result<_, _>>()
         .map_err(|_| "cannot construct service ACL identities")?;
-    if descriptor.owner().is_none_or(|owner| !allowed.iter().any(|sid| owner == &**sid)) {
-        return Err("credential owner must be SYSTEM, Administrators or LocalService".into());
+    let trusted = |owner: &Sid| allowed.iter().any(|sid| owner == &**sid) || service_account == Some(owner);
+    if descriptor.owner().is_none_or(|owner| !trusted(owner)) {
+        return Err("credential owner must be SYSTEM, Administrators or the registered service identity".into());
     }
     let acl = descriptor.dacl().ok_or("credential ACL must not grant everyone access")?;
     if acl.len() == 0 || acl.len() > 32 {
@@ -267,8 +286,11 @@ fn windows_descriptor_private(descriptor: &windows_permissions::SecurityDescript
     }
     for index in 0..acl.len() {
         let ace = acl.get_ace(index).ok_or("credential ACL is malformed")?;
-        if ace.ace_type() != AceType::ACCESS_ALLOWED_ACE_TYPE || ace.sid().is_none_or(|owner| !allowed.iter().any(|sid| owner == &**sid)) {
-            return Err("credential ACL may grant access only to SYSTEM, Administrators and LocalService; ordinary Users access is forbidden".into());
+        if ace.ace_type() != AceType::ACCESS_ALLOWED_ACE_TYPE || ace.sid().is_none_or(|owner| !trusted(owner)) {
+            return Err(
+                "credential ACL may grant access only to SYSTEM, Administrators and the service identities; ordinary Users access is forbidden"
+                    .into(),
+            );
         }
     }
     if directory {
@@ -533,7 +555,13 @@ mod tests {
     fn windows_service_acl_accepts_only_protected_service_identities() {
         use windows_permissions::{LocalBox, SecurityDescriptor};
         let good: LocalBox<SecurityDescriptor> = "O:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;LS)".parse().unwrap();
-        assert!(windows_descriptor_private(&good, true).is_ok());
+        assert!(windows_descriptor_private(&good, true, None).is_ok());
+        let service_sid = "S-1-5-80-4013549229-3107762393-4025766903-2826249871-1347187068";
+        let named_sid: windows_permissions::LocalBox<windows_permissions::Sid> = "S-1-5-21-100-200-300-1001".parse().unwrap();
+        let named: LocalBox<SecurityDescriptor> =
+            format!("O:{named_sid}D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;{service_sid})").parse().unwrap();
+        assert!(windows_descriptor_private(&named, false, Some(&named_sid)).is_ok());
+        assert!(windows_descriptor_private(&named, false, None).is_err());
         for sddl in [
             "O:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;LS)(A;OICI;GR;;;BU)",
             "O:BAD:(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;LS)",
@@ -542,7 +570,7 @@ mod tests {
             "O:BA",
         ] {
             let descriptor: LocalBox<SecurityDescriptor> = sddl.parse().unwrap();
-            assert!(windows_descriptor_private(&descriptor, true).is_err(), "{sddl}");
+            assert!(windows_descriptor_private(&descriptor, true, None).is_err(), "{sddl}");
         }
         let temp = tempfile::tempdir().unwrap();
         let store = CredentialStore::ServiceDirectory { directory: temp.path().to_owned() };

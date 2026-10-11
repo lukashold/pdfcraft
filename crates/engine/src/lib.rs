@@ -2059,6 +2059,8 @@ pub struct Session {
     next_id: u64,
     /// Seconds since the Unix epoch, injected so saves are deterministic in tests.
     clock: Option<fn() -> i64>,
+    /// Stable transaction time for replayable unattended exports.
+    fixed_timestamp: Option<i64>,
     /// Certificates trusted for signing (Acrobat: Trusted Certificates).
     trust: Arc<TrustStore>,
     /// Preferences ▸ JavaScript ▸ Enable Acrobat JavaScript, inverted (on by default).
@@ -2176,6 +2178,15 @@ impl Session {
     /// Use a fixed clock (tests) instead of the system time.
     pub fn with_clock(mut self, clock: fn() -> i64) -> Self {
         self.clock = Some(clock);
+        self.fixed_timestamp = None;
+        self
+    }
+
+    /// Keep newly written PDF metadata identical when a Hot Folder transaction is replayed.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn with_timestamp(mut self, timestamp: i64) -> Self {
+        self.fixed_timestamp = Some(timestamp);
+        self.clock = None;
         self
     }
 
@@ -2185,6 +2196,9 @@ impl Session {
     }
 
     fn now(&self) -> Option<i64> {
+        if let Some(timestamp) = self.fixed_timestamp {
+            return Some(timestamp);
+        }
         if let Some(c) = self.clock {
             return Some(c());
         }

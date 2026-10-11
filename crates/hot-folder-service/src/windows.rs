@@ -78,6 +78,25 @@ pub fn uninstall() -> Result<(), String> {
     Err("Remove the optional Hot Folder component with the PdfCraft installer, which also removes its Windows service.".into())
 }
 
+pub fn prepare_account() -> Result<(), String> {
+    let handle = service(ServiceAccess::CHANGE_CONFIG | ServiceAccess::START)
+        .map_err(|e| format!("Administrator permission is required to prepare the Windows service: {e}"))?;
+    // A stable service SID keeps installer-protected data accessible when an
+    // administrator changes Log On to a domain account or gMSA in Windows SCM.
+    handle.set_config_service_sid_info(ServiceSidType::Unrestricted).map_err(|e| e.to_string())?;
+    handle
+        .update_failure_actions(ServiceFailureActions {
+            reset_period: ServiceFailureResetPeriod::After(Duration::from_secs(86400)),
+            reboot_msg: Some("".into()),
+            command: Some("".into()),
+            // SCM repeats the final action for subsequent failures. A delay avoids
+            // a tight crash loop while retaining recovery after prolonged outages.
+            actions: Some(vec![ServiceAction { action_type: ServiceActionType::Restart, delay: Duration::from_secs(60) }]),
+        })
+        .map_err(|e| e.to_string())?;
+    handle.set_failure_actions_on_non_crash_failures(true).map_err(|e| e.to_string())
+}
+
 static JOB: OnceLock<(PathBuf, Worker)> = OnceLock::new();
 static OUTCOME: OnceLock<Result<(), String>> = OnceLock::new();
 windows_service::define_windows_service!(service_entry, service_main);
@@ -124,8 +143,8 @@ fn host() -> Result<(), String> {
     handle.set_service_status(status_value(ServiceState::Running, false)).map_err(|e| e.to_string())?;
     let finished = AtomicBool::new(false);
     let result = std::thread::scope(|scope| {
-        // Report cancellation while the current page finishes. Bounded wait hints prevent
-        // Windows from treating a long OCR page as an unresponsive stop request.
+        // The supervisor terminates its task child within a bounded grace period.
+        // Keep SCM informed while that child releases its journal lock.
         let monitor = std::thread::Builder::new()
             .name("service-stop-status".into())
             .spawn_scoped(scope, || {
@@ -135,7 +154,7 @@ fn host() -> Result<(), String> {
                         checkpoint = checkpoint.saturating_add(1);
                         let mut state = status_value(ServiceState::StopPending, false);
                         state.checkpoint = checkpoint;
-                        state.wait_hint = Duration::from_secs(120);
+                        state.wait_hint = Duration::from_secs(15);
                         let _ = handle.set_service_status(state);
                     }
                     std::thread::sleep(Duration::from_millis(250));

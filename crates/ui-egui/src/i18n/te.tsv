@@ -2161,3 +2161,7 @@ key	Space	స్పేస్
 	The historical model detects its supported scripts automatically; Japanese is not included.	చారిత్రక మోడల్ మద్దతు ఉన్న లిపులను స్వయంచాలకంగా గుర్తిస్తుంది; జపనీస్ చేర్చబడలేదు.
 	Historical handwriting (Kurrent)	చారిత్రక చేతిరాత (Kurrent)
 	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	చేతిరాతకు ఒకే వచన నిలువు వరుసలో సరైన దిశలో ఉన్న అడ్డ పంక్తులు అవసరం. బహుళ నిలువు వరుసలు, పట్టికలు మరియు అంచు గమనికలకు మద్దతు లేదు.
+
+# Touch and pen controls
+	Touch and pen	టచ్ మరియు పెన్
+	Larger drawing tools. Use two fingers to move or zoom; use Hand to move with one finger.	పెద్ద డ్రాయింగ్ సాధనాలు. తరలించడానికి లేదా జూమ్ చేయడానికి రెండు వేళ్లు వాడండి; ఒక వేలితో తరలించడానికి హ్యాండ్ సాధనం వాడండి.

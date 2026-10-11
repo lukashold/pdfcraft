@@ -67,6 +67,8 @@ jobs:
 
       - name: Test
         if: runner.os != 'Linux'
+        env:
+          PDFCRAFT_REQUIRE_SYMLINK_TESTS: "1"
         run: cargo test --workspace
 
       - name: Test (with craft-fonts)

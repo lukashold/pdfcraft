@@ -4,6 +4,7 @@
 
 .DESCRIPTION
   Produces, in $env:DIST (default: dist/release):
+    pdfcraft-<version>-windows-<arch>-setup.exe      offline installer, automatic UI language
     pdfcraft-<version>-windows-<arch>.msi            per-machine installer (WiX v5)
     pdfcraft-<version>-windows-<arch>-portable.zip   pdfcraft.exe + pdfcraft-cli.exe + models\ + portable.txt
 
@@ -136,19 +137,12 @@ if (-not (Test-Path (Join-Path $Models 'ATTRIBUTION.txt')) -or -not (Get-ChildIt
 
 # ---- MSI ---------------------------------------------------------------------------------------
 $Msi = Join-Path $Dist "pdfcraft-$Version-windows-$Arch.msi"
-Invoke-Native 'WiX service configuration extension' { wix extension add -g WixToolset.Util.wixext/5.0.2 }
-Invoke-Native 'wix build' {
-  wix build (Join-Path $PSScriptRoot 'pdfcraft.wxs') -arch $Arch -ext WixToolset.Util.wixext `
-    (Join-Path $PSScriptRoot 'installer-ui.wxs') `
-    -d "Version=$MsiVersion" -d "BinDir=$Stage" -d "ModelsDir=$Models" -d "IconPath=$(Join-Path $Root 'assets\app-icon\pdfcraft.ico')" `
-    -o $Msi
-}
-# Inspect the built MSI, not just the XML, before signing/publishing it. In a child process, so
-# its Windows Installer database handle is gone before signtool opens the MSI.
+$Setup = Join-Path $Dist "pdfcraft-$Version-windows-$Arch-setup.exe"
+& (Join-Path $PSScriptRoot 'build-localized.ps1') -Arch $Arch -Version $MsiVersion -BundleVersion $Version `
+  -BinDir $Stage -ModelsDir $Models -IconPath (Join-Path $Root 'assets/app-icon/pdfcraft.ico') `
+  -Msi $Msi -Setup $Setup -Work (Join-Path $Stage 'installer-languages')
+# Inspect service, scope, shortcut and model authoring after language embedding.
 Invoke-Native 'test-msi' { & (Get-Process -Id $PID).Path -NoProfile -File (Join-Path $PSScriptRoot 'test-msi.ps1') $Msi }
-# wix writes its debug symbols (.wixpdb) next to the MSI; keep them out of the release assets.
-Remove-Item -Force -ErrorAction SilentlyContinue ([IO.Path]::ChangeExtension($Msi, '.wixpdb'))
-& (Join-Path $PSScriptRoot 'sign.ps1') $Msi
 
 # ---- portable zip ------------------------------------------------------------------------------
 $Portable = Join-Path $TargetDir "windows-package\pdfcraft-$Version-windows-$Arch-portable"
@@ -186,4 +180,4 @@ if ($Arch -ne 'arm64' -or $HostArch -eq 'arm64') {
 } else {
   Write-Output "skipping pdfcraft-cli --version: an $Arch build doesn't run on this $HostArch machine"
 }
-Get-Item $Msi, $Zip | Format-Table Name, Length
+Get-Item $Setup, $Msi, $Zip | Format-Table Name, Length

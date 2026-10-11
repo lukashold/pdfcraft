@@ -1,6 +1,15 @@
 name: Hot Folder system services
 on:
   workflow_dispatch:
+  push:
+    branches: [codex/hot-folder]
+    paths:
+      - 'crates/hot-folder-service/**'
+      - 'packaging/service-tests/**'
+      - 'packaging/windows/**'
+      - 'packaging/macos/**'
+      - 'packaging/linux/**'
+      - '.github/workflows/hot-folder-services.yml'
   pull_request:
     paths:
       - 'crates/hot-folder-service/**'
@@ -16,9 +25,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
+        os: [ubuntu-24.04, windows-2022, windows-2025, macos-15]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -48,6 +57,6 @@ jobs:
       - if: always() && runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: hot-folder-msi-lifecycle-logs
+          name: hot-folder-msi-lifecycle-logs-${{ matrix.os }}
           path: ${{ runner.temp }}/hot-folder-msi/*.log
           if-no-files-found: ignore

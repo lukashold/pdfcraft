@@ -2226,3 +2226,7 @@ key	Space	Spacja
 	The historical model detects its supported scripts automatically; Japanese is not included.	Model historyczny automatycznie wykrywa obsługiwane pisma; język japoński nie jest uwzględniony.
 	Historical handwriting (Kurrent)	Historyczne pismo odręczne (kurrent)
 	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	Pismo odręczne wymaga prawidłowo obróconych poziomych wierszy w jednej kolumnie. Wiele kolumn, tabele i notatki na marginesach nie są obsługiwane.
+
+# Touch and pen controls
+	Touch and pen	Dotyk i pióro
+	Larger drawing tools. Use two fingers to move or zoom; use Hand to move with one finger.	Większe narzędzia rysowania. Przesuwaj lub powiększaj dwoma palcami; narzędziem Rączka przesuwaj jednym palcem.

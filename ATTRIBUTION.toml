@@ -19,7 +19,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Simplified Chinese UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "1d142c2e21b0bdc86c7cdbf53b9e58e8ef5ad5409a787cdbdb6b51029b13cc66"
+sha256 = "828e1c47e23af97829ec0b6d1deaf1d2f0fc475c2f9f042ce2fca64f2e1313be"
 
 [[asset]]
 path = "crates/ui-egui/src/i18n/zh-hant.tsv"
@@ -30,7 +30,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Traditional Chinese UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "d9430587e07244a43a213441fc392522405e8ab0db9da0422769efa825d85257"
+sha256 = "9f10528dc080484dc761390899dd43c3097ec98eb68c8ae98428ab11bb522a14"
 
 [[asset]]
 path = "crates/ui-egui/src/i18n/cs.tsv"
@@ -41,7 +41,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Czech UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "1df98b6d549d6dab6f4bf5665a2f88c2d30e382d931a04ca50c899bbbbab5d17"
+sha256 = "5af377b3701f6c1b629708cd6ec089aecdaa797735019b8373f9f16d2fc566f5"
 
 [[asset]]
 path = "crates/ui-egui/src/i18n/pt-br.tsv"
@@ -52,7 +52,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Brazilian Portuguese UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "936d97d54dddfb198c1e4a7e181e152ce0baa0bb17c94a2498448e87be9ac957"
+sha256 = "eab7ee2c41928b39710ac2c69b317995c5215f202f4e9363d47182c1a7a43ed7"
 
 [[asset]]
 path = "crates/ui-egui/src/i18n/es.tsv"
@@ -63,7 +63,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Spanish UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "9dcc367612f369fbe14b3b7be236fc3db84bcb994ef7abaf3e840ff2c3063670"
+sha256 = "24930b2e834630fae42798553c8cd4fe52c7cf604a5d4f552e6644fff003943f"
 
 [[asset]]
 path = "crates/ui-egui/src/i18n/fr.tsv"
@@ -74,7 +74,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "French UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "32931502668c31de94fbd8e04e5f2472a839a79a51d251c4eeab19706ccb55a5"
+sha256 = "8447dbc46732c31406e120953e3700c988f84857f2c9873a69637f070e31c5f0"
 
 [[asset]]
 path = "crates/ui-egui/src/i18n/de.tsv"
@@ -85,7 +85,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "German UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "95e7e53c5214744cdcab9cce908c74f59a17f8a9bb926b81a0f337938fd20fd4"
+sha256 = "fd7a564cfb4be91e228ecbb162f5f05dccee54aa241da9d48f9ddad01ea3809d"
 
 [[asset]]
 path = "crates/ui-egui/src/i18n/te.tsv"
@@ -96,7 +96,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Telugu UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "21ff9ae27c6e032040e88adcd31c761d96c7e74b1c9cbdb4e1e5484c248e48bf"
+sha256 = "35ed24e66d5215cd2d8ac10cf12f257215802471cc8e5c3462b2b6300ff0a692"
 
 [[asset]]
 path = "crates/ui-egui/src/i18n/it.tsv"
@@ -107,7 +107,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Italian UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "e328efd0e9b4b939d0d5adc33ab844bae9babedc6679ad7923fc11eed8acb00b"
+sha256 = "387d6e3e0fb8980e135c8a70205ffef988518bf030a3526a36444e6e46d3bd44"
 
 [[asset]]
 path = "crates/ui-egui/src/i18n/pl.tsv"
@@ -118,7 +118,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Polish UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "b7284d0ee265681f07bf331060dbdcb0bd527df8fbaa1b35a2dc1ab3eb4ff5d2"
+sha256 = "c5d4a0579fe57dca65aa85c2d40e0d05a3693ff23ab32807202c9ea5dad8951c"
 
 [[asset]]
 path = "crates/ui-egui/src/i18n/ru.tsv"
@@ -129,7 +129,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Russian UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "f2a380c2e38b5b2778fa7e23b943e19e0b561bd291d5417cf16daea2c0453243"
+sha256 = "97a4542a4c42cd84e3a58c8d9d3717b3492b9b92766a4233a58829a62863fbfc"
 
 [[asset]]
 path = "crates/ui-egui/src/i18n/hu.tsv"
@@ -140,7 +140,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Hungarian UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "3a07f1ba1f519bcd142a80209654781597b2311ab3e6d49c5dac4c6f8ffb8780"
+sha256 = "b6a708adc0bc6215c7aac237f5c2139252c77b9b691761c0f2fc09df11640ed0"
 
 [[asset]]
 path = "crates/ui-egui/src/i18n/bg.tsv"
@@ -151,7 +151,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Bulgarian UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "9f4835ed131e1149ee6122d4f1ac7e7cedc8c9a6ed1cae21a1f12600d4d83789"
+sha256 = "fff654f5693aca70810d9db753e9be427a5f6fd7f4f884e6e146913a7975f955"
 
 [[asset]]
 path = "crates/ui-egui/src/i18n/ja.tsv"
@@ -162,7 +162,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Japanese UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "870ee240dcb2dceafcf3f2d2ef2fc9b94ee99989dd2d299b98c6917f1cd2654a"
+sha256 = "1f8bd917c1c1a5f7aaa7f601645795a95cbdd75df6340079e7d8554b95ab1236"
 
 [[asset]]
 path = "crates/ui-egui/src/i18n/uk.tsv"
@@ -173,7 +173,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Ukrainian UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "99cafbb95895ab11aa734102a1281b98a38ec6fda354bffd4a37afa2fa3753d9"
+sha256 = "d535fc24919ec299313639dc3cf795c651525aec8bc705a03d4e60719e5b8305"
 
 [[asset]]
 path = "crates/ui-egui/src/i18n/ar.tsv"
@@ -184,7 +184,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Arabic UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "031c00da8e92a01765aefaed695f63edd8e63f1d184b446588ef853c0523ae75"
+sha256 = "c40a956c7c773f4a4505599d0a4285d08fc3389c0cb75abfc36e7b5c2bd1c6b1"
 
 [[asset]]
 path = "assets/icons/accessibility.svg"
@@ -3353,3 +3353,157 @@ licence_sha256 = "a8ad31b1c3f40dca5a84119351b8fa8ddc868edd77fad8a8ebf6d8f2d16fa4
 kind = "model"
 usage = "Optional historical OCR add-on character mapping; installed atomically with its matching model after explicit user action"
 sha256 = "dc2070c479e38ccdce553fbfc96af26e6824333dcc969b8855875acd54f85fde"
+
+[[asset]]
+path = "packaging/windows/locales/de.wxl"
+title = "PdfCraft installer translation catalog (de)"
+author = "PdfCraft contributors"
+source = "Contributor-original: clean-room translations of PdfCraft installer labels; no proprietary localization resources"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "translation"
+usage = "Native installer UI; English also supplies generated fallback locale catalogs"
+sha256 = "a2fb02e52e23b871339f92af3874fbd5c35fd7fb00e551c7b011e937d4f7d1c6"
+
+[[asset]]
+path = "packaging/windows/locales/en.wxl"
+title = "PdfCraft installer translation catalog (en)"
+author = "PdfCraft contributors"
+source = "Contributor-original: clean-room translations of PdfCraft installer labels; no proprietary localization resources"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "translation"
+usage = "Native installer UI; English also supplies generated fallback locale catalogs"
+sha256 = "176e21d1bb8d473a78bb294ece6034e7d23644304ee04d53c65b14b380c895f6"
+
+[[asset]]
+path = "packaging/windows/locales/es.wxl"
+title = "PdfCraft installer translation catalog (es)"
+author = "PdfCraft contributors"
+source = "Contributor-original: clean-room translations of PdfCraft installer labels; no proprietary localization resources"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "translation"
+usage = "Native installer UI; English also supplies generated fallback locale catalogs"
+sha256 = "151645e9eacac1844766594e331a4d86f33d3c070bcd2e8684f92193f0c40a21"
+
+[[asset]]
+path = "packaging/windows/locales/fr.wxl"
+title = "PdfCraft installer translation catalog (fr)"
+author = "PdfCraft contributors"
+source = "Contributor-original: clean-room translations of PdfCraft installer labels; no proprietary localization resources"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "translation"
+usage = "Native installer UI; English also supplies generated fallback locale catalogs"
+sha256 = "1d246aff45ce25a07dd7cc12d14dd83e5ee95b1353e1a42ab8a2ca943b5c4b57"
+
+[[asset]]
+path = "packaging/windows/locales/hu.wxl"
+title = "PdfCraft installer translation catalog (hu)"
+author = "PdfCraft contributors"
+source = "Contributor-original: clean-room translations of PdfCraft installer labels; no proprietary localization resources"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "translation"
+usage = "Native installer UI; English also supplies generated fallback locale catalogs"
+sha256 = "9b0a2ae2bc6d0cfb905a0fa543c92fa56582b227f71e54046a5b8108665dfe95"
+
+[[asset]]
+path = "packaging/windows/locales/it.wxl"
+title = "PdfCraft installer translation catalog (it)"
+author = "PdfCraft contributors"
+source = "Contributor-original: clean-room translations of PdfCraft installer labels; no proprietary localization resources"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "translation"
+usage = "Native installer UI; English also supplies generated fallback locale catalogs"
+sha256 = "f38d7f6f452013d2a2da0c369451e73ba3fc18a2565c828b77ae45c14c3f5d14"
+
+[[asset]]
+path = "packaging/windows/locales/nl.wxl"
+title = "PdfCraft installer translation catalog (nl)"
+author = "PdfCraft contributors"
+source = "Contributor-original: clean-room translations of PdfCraft installer labels; no proprietary localization resources"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "translation"
+usage = "Native installer UI; English also supplies generated fallback locale catalogs"
+sha256 = "f3c8e97ecb0e30a10d73b1884313b02e0848243fd6f1545ae0b8641fa6247b67"
+
+[[asset]]
+path = "packaging/macos/resources/de.lproj/Localizable.strings"
+title = "PdfCraft installer translation catalog (de)"
+author = "PdfCraft contributors"
+source = "Contributor-original: clean-room translations of PdfCraft installer labels; no proprietary localization resources"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "translation"
+usage = "Native installer UI; English also supplies generated fallback locale catalogs"
+sha256 = "39fa7b20f8d9e08141c41927a3638785d963a682a75318a64bc4a36fea7b29ec"
+
+[[asset]]
+path = "packaging/macos/resources/en.lproj/Localizable.strings"
+title = "PdfCraft installer translation catalog (en)"
+author = "PdfCraft contributors"
+source = "Contributor-original: clean-room translations of PdfCraft installer labels; no proprietary localization resources"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "translation"
+usage = "Native installer UI; English also supplies generated fallback locale catalogs"
+sha256 = "d4471cf4a88329a94f2dc87ebe50d5067c09505f7bdd966e41a0f388671eab1d"
+
+[[asset]]
+path = "packaging/macos/resources/es.lproj/Localizable.strings"
+title = "PdfCraft installer translation catalog (es)"
+author = "PdfCraft contributors"
+source = "Contributor-original: clean-room translations of PdfCraft installer labels; no proprietary localization resources"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "translation"
+usage = "Native installer UI; English also supplies generated fallback locale catalogs"
+sha256 = "72e6e132c8b14875f7d1aac54a74d9958c2179ce131b02df3311d64efab2978c"
+
+[[asset]]
+path = "packaging/macos/resources/fr.lproj/Localizable.strings"
+title = "PdfCraft installer translation catalog (fr)"
+author = "PdfCraft contributors"
+source = "Contributor-original: clean-room translations of PdfCraft installer labels; no proprietary localization resources"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "translation"
+usage = "Native installer UI; English also supplies generated fallback locale catalogs"
+sha256 = "9e0e98b3d8397a3322578be46c69c04e61a2ade02f73d6d4aeb7cab093d5129f"
+
+[[asset]]
+path = "packaging/macos/resources/hu.lproj/Localizable.strings"
+title = "PdfCraft installer translation catalog (hu)"
+author = "PdfCraft contributors"
+source = "Contributor-original: clean-room translations of PdfCraft installer labels; no proprietary localization resources"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "translation"
+usage = "Native installer UI; English also supplies generated fallback locale catalogs"
+sha256 = "1bfb5836c5b0c2d7f148263c115a707951ed223a7b5924b763972a3f0226a4a2"
+
+[[asset]]
+path = "packaging/macos/resources/it.lproj/Localizable.strings"
+title = "PdfCraft installer translation catalog (it)"
+author = "PdfCraft contributors"
+source = "Contributor-original: clean-room translations of PdfCraft installer labels; no proprietary localization resources"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "translation"
+usage = "Native installer UI; English also supplies generated fallback locale catalogs"
+sha256 = "d10653056aa636f37d6ca314c706880517cd0559c1d2a942e59070ca66f59da1"
+
+[[asset]]
+path = "packaging/macos/resources/nl.lproj/Localizable.strings"
+title = "PdfCraft installer translation catalog (nl)"
+author = "PdfCraft contributors"
+source = "Contributor-original: clean-room translations of PdfCraft installer labels; no proprietary localization resources"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "translation"
+usage = "Native installer UI; English also supplies generated fallback locale catalogs"
+sha256 = "a5d24537af99f5b607b014c395859508baa05b7f4b8dfec9da78e7c6539931ca"

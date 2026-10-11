@@ -1,0 +1,90 @@
+Installer languages
+===================
+
+PdfCraft-owned installation dialogs and optional Hot Folder descriptions are
+translated into English, German, French, Spanish, Dutch, Italian and Hungarian.
+The catalogs are contributor-original, licensed MIT OR Apache-2.0 and recorded
+per file in ATTRIBUTION.toml. They contain no third-party artwork or fonts.
+Native OS prompts (for example UAC and Apple's authentication sheet) are supplied
+and localized by the operating system.
+
+Windows
+-------
+Use pdfcraft-<version>-windows-<arch>-setup.exe for interactive installation.
+This offline WiX Burn bundle embeds one MSI, including its six language MSTs,
+and delegates all installation choices to that MSI's existing native dialogs.
+Hot Folder remains optional and initially off. There is no extra language prompt,
+installer network download, custom bootstrapper runtime, or OCR model duplication.
+
+Burn's UserUILanguageID selects the primary display language. Do not replace this
+with UserLanguageID: that is the formatting locale and can differ from the UI.
+All six sublanguage bits are accepted, including de-AT, fr-CA, es-MX, nl-BE and
+it-CH. Unsupported primary languages leave the English base untouched. MSI
+maintenance uses Windows Installer's cached installation transforms.
+
+The .msi is retained for administrative deployment; launching it directly uses
+English unless the administrator supplies an embedded transform, for example:
+
+  msiexec /i pdfcraft.msi TRANSFORMS=:de.mst INSTALLHOTFOLDER=1
+
+Available transforms: de.mst, fr.mst, es.mst, nl.mst, it.mst, hu.mst.
+Use TRANSFORMS=:hu.mst for Hungarian (database codepage 1250); the other catalogs
+use 1252. The MSI's Template Summary lists all seven languages. Every localized
+build shares a ProductCode, component GUIDs and payload; language transforms do
+not change the service/account/ACL setup or optional feature state.
+
+package.ps1 invokes build-localized.ps1 and inspects all embedded transforms.
+One CAB cache is reused and localized staging MSIs are removed after creating
+their small transforms. Signing occurs after embedding the transforms. The Burn
+engine is detached, signed, reattached, and the final bundle is signed as well.
+Burn keeps the full release/SemVer version separately from the numeric MSI
+ProductVersion so successive preview installers remain distinguishable.
+Unsigned preview builds retain the existing explicit signing warning.
+
+macOS
+-----
+The PKG uses native Installer .lproj/Localizable.strings resources; the DMG has
+no installer dialogs. Distribution choice descriptions are localization keys.
+English is also the nonlocalized key text and fallback table.
+
+prepare-resources.sh obtains known ISO language codes from the build system's
+Foundation NSLocale API and generates English fallback catalogs for other
+languages. These are not additional translations: they prevent a primary
+unsupported language from falling through to a translated secondary preference
+(e.g. Japanese followed by German). Chinese script aliases are included too.
+The seven actual catalogs stay separate and are never overwritten by fallbacks.
+No installation-time scripts are added for localization.
+
+Validation
+----------
+  python packaging/test-installer-languages.py
+  pwsh packaging/windows/test-language-build.ps1 -Arch arm64 -Work NEW_SCRATCH
+  pwsh packaging/windows/test-language-build.ps1 -Arch x64 -Work NEW_SCRATCH
+  bash packaging/macos/test-localized-pkg.sh NEW_SCRATCH
+
+The Windows fixture builds real MSI/Setup containers with tiny inert payloads.
+It applies each actual embedded transform to a disposable database, checks every
+dialog/control string, language, codepage, package identity, service authoring
+and feature default. It extracts the finished Setup, checks the embedded MSI
+hash and PE architecture, and exhaustively verifies all 65,536 LANGIDs against
+the compiled Burn language selectors. It never executes Setup or installs MSI.
+
+The macOS fixture invokes pkgbuild/productbuild, expands the real PKG, checks its
+catalogs and default-off Hot Folder choice, and uses Apple's Foundation locale
+resolver for regional and fallback cases. It never installs the package.
+The installer-languages.yml workflow performs these checks on Windows (x64,
+ARM64 and x86 authoring) and macOS without building the PDF/OCR application.
+These are packaging tests; they do not claim visual inspection on every OS
+display language or exercise certificate-backed signing without CI secrets.
+
+Primary technical references
+----------------------------
+https://docs.firegiant.com/wix/tools/burn/builtin-variables/
+https://docs.firegiant.com/wix/schema/bal/wixinternaluibootstrapperapplication/
+https://docs.firegiant.com/wix/schema/wxs/setvariable/
+https://docs.firegiant.com/wix/tools/wixexe/
+https://docs.firegiant.com/wix/tools/signing/
+https://learn.microsoft.com/en-us/windows/win32/msi/embedded-transforms
+https://learn.microsoft.com/en-us/windows/win32/msi/code-page-handling-of-parameter-strings
+https://developer.apple.com/library/archive/documentation/DeveloperTools/Reference/DistributionDefinitionRef/Chapters/Distribution_XML_Ref.html
+https://developer.apple.com/documentation/foundation/nslocale/isolanguagecodes

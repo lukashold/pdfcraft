@@ -7,6 +7,7 @@ mod source_ui;
 mod startup;
 mod ui;
 mod worker;
+mod worker_process;
 
 use pdfcraft_engine::hot_folder as hf;
 use std::path::{Path, PathBuf};
@@ -51,6 +52,8 @@ fn run() -> Result<(), String> {
     let mut service_action = None;
     let mut account = String::new();
     let mut initialize = false;
+    let mut task_child = false;
+    let mut task_id = None;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--config" => path = Some(PathBuf::from(args.next().ok_or("--config needs a file path")?)),
@@ -58,8 +61,10 @@ fn run() -> Result<(), String> {
             "--once" => once = true,
             "--service" => service = true,
             "--initialize-config" => initialize = true,
+            "--task-child" => task_child = true,
+            "--task-id" => task_id = Some(args.next().ok_or("--task-id needs an ID")?),
             "--service-action" => {
-                service_action = Some(args.next().ok_or("--service-action needs status/start/stop/enable/disable/install/uninstall")?)
+                service_action = Some(args.next().ok_or("--service-action needs status/start/stop/enable/disable/install/uninstall/prepare-account")?)
             }
             "--account" => account = args.next().ok_or("--account needs a non-root service account")?,
             "--version" => {
@@ -68,7 +73,7 @@ fn run() -> Result<(), String> {
             }
             "--help" | "-h" => {
                 println!(
-                    "PdfCraft Hot Folder\n  pdfcraft-hot-folder [--config FILE]\n  pdfcraft-hot-folder --worker --config FILE\n  pdfcraft-hot-folder --once --config FILE\n  pdfcraft-hot-folder --service --config FILE\n  pdfcraft-hot-folder --initialize-config --config FILE\n  pdfcraft-hot-folder --service-action status|start|stop|enable|disable|install|uninstall --config FILE [--account USER]\nThe GUI saves opt-in tasks. --once runs one scheduler pass; --service hosts a registered boot service. No network listener is opened."
+                    "PdfCraft Hot Folder\n  pdfcraft-hot-folder [--config FILE]\n  pdfcraft-hot-folder --worker --config FILE\n  pdfcraft-hot-folder --once --config FILE\n  pdfcraft-hot-folder --service --config FILE\n  pdfcraft-hot-folder --initialize-config --config FILE\n  pdfcraft-hot-folder --service-action status|start|stop|enable|disable|install|uninstall|prepare-account --config FILE [--account USER]\nThe GUI saves opt-in tasks. --once runs one supervised scheduler pass; --service hosts a registered boot service. Task passes default to a 300-second deadline; local tasks.worker.json can override worker limits. No network listener is opened."
                 );
                 return Ok(());
             }
@@ -77,8 +82,21 @@ fn run() -> Result<(), String> {
     }
     let config = path.map(Ok).unwrap_or_else(default_config)?;
     let config = if config.is_absolute() { config } else { std::env::current_dir().map_err(|e| e.to_string())?.join(config) };
-    if usize::from(service) + usize::from(once) + usize::from(background) + usize::from(service_action.is_some()) + usize::from(initialize) > 1 {
+    if usize::from(service)
+        + usize::from(once)
+        + usize::from(background)
+        + usize::from(service_action.is_some())
+        + usize::from(initialize)
+        + usize::from(task_child)
+        > 1
+    {
         return Err("choose only one operating mode".into());
+    }
+    if task_child {
+        return worker_process::child_main(&config, &task_id.ok_or("the task child needs --task-id")?);
+    }
+    if task_id.is_some() {
+        return Err("--task-id is reserved for supervised task children".into());
     }
     if initialize {
         return hf::initialize_config(&config);
@@ -97,15 +115,15 @@ fn run() -> Result<(), String> {
             "disable" => svc::set_enabled(false, &exe, &config),
             "install" => svc::install(&exe, &config, &account),
             "uninstall" => svc::uninstall(&exe, &config),
-            _ => Err("unknown service action; use status/start/stop/enable/disable/install/uninstall".into()),
+            "prepare-account" => svc::prepare_account(&exe, &config),
+            _ => Err("unknown service action; use status/start/stop/enable/disable/install/uninstall/prepare-account".into()),
         };
     }
     if service {
         return pdfcraft_hot_folder_service::run(&config, |path, stop| worker::run(path, || stop.load(std::sync::atomic::Ordering::Relaxed)));
     }
     if once {
-        worker::check_identity()?;
-        let state = hf::poll(&config, None)?;
+        let state = worker::once(&config)?;
         println!("{}", serde_json::to_string_pretty(&state).map_err(|e| e.to_string())?);
         return Ok(());
     }

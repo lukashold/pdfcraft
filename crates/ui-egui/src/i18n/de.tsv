@@ -2231,3 +2231,7 @@ key	Space	Leertaste
 	The historical model detects its supported scripts automatically; Japanese is not included.	Das historische Modell erkennt seine unterstützten Schriften automatisch; Japanisch ist nicht enthalten.
 	Historical handwriting (Kurrent)	Historische Handschrift (Kurrent)
 	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	Handschrift benötigt aufrechte, waagerechte Zeilen in einer Textspalte. Mehrere Spalten, Tabellen und Randnotizen werden nicht unterstützt.
+
+# Touch and pen controls
+	Touch and pen	Touch und Stift
+	Larger drawing tools. Use two fingers to move or zoom; use Hand to move with one finger.	Größere Zeichenwerkzeuge. Mit zwei Fingern verschieben oder zoomen; mit dem Handwerkzeug mit einem Finger verschieben.

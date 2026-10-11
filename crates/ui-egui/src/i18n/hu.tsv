@@ -2229,3 +2229,7 @@ key	Space	Szóköz
 	The historical model detects its supported scripts automatically; Japanese is not included.	A történelmi modell automatikusan felismeri a támogatott írásokat; a japán nem tartozik közéjük.
 	Historical handwriting (Kurrent)	Történelmi kézírás (kurrent)
 	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	A kézíráshoz helyes irányú, vízszintes sorok szükségesek egyetlen szövegoszlopban. Több oszlop, táblázatok és széljegyzetek nem támogatottak.
+
+# Touch and pen controls
+	Touch and pen	Érintés és toll
+	Larger drawing tools. Use two fingers to move or zoom; use Hand to move with one finger.	Nagyobb rajzeszközök. Két ujjal mozgathatsz vagy nagyíthatsz; egyujjas mozgatáshoz használd a Kéz eszközt.

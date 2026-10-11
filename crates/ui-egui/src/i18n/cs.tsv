@@ -217,3 +217,7 @@ key	Space	Mezerník
 	The historical model detects its supported scripts automatically; Japanese is not included.	Historický model automaticky rozpoznává podporovaná písma; japonština není zahrnuta.
 	Historical handwriting (Kurrent)	Historický rukopis (kurent)
 	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	Rukopis vyžaduje správně orientované vodorovné řádky v jednom sloupci. Více sloupců, tabulky a okrajové poznámky nejsou podporovány.
+
+# Touch and pen controls
+	Touch and pen	Dotyk a pero
+	Larger drawing tools. Use two fingers to move or zoom; use Hand to move with one finger.	Větší nástroje kreslení. Dvěma prsty posouvejte nebo přibližujte; nástrojem Ruka posouvejte jedním prstem.

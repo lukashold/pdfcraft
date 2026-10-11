@@ -9,11 +9,19 @@ pub(super) fn local_paths(source: &ProjectSource, root: Option<&Path>) -> Result
 
 /// An unprocessed missing project entry is an error, never a silently truncated
 /// grouped output. Completed move/delete entries stay in the immutable manifest.
-pub(super) fn validate_and_order(source: &ProjectSource, root: Option<&Path>, journal: &Journal, report: &mut StageReport) -> Result<(), String> {
+pub(super) fn validate_and_order(
+    source: &ProjectSource,
+    input: &Path,
+    root: Option<&Path>,
+    journal: &Journal,
+    report: &mut StageReport,
+) -> Result<(), String> {
     let (base, manifest) = manifest(source, root)?;
     for relative in &manifest.files {
         if fs::symlink_metadata(base.join(relative)).is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound)
             && !journal.records.values().any(|record| record.remote.relative == *relative)
+            && !archived_relative(input, &journal.config_hash, relative)?
+                .is_some_and(|record| record.acknowledged && record.remote.relative == *relative)
         {
             return Err("project contains a missing, unprocessed source; restore it before processing the project".into());
         }

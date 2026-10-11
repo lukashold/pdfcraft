@@ -2251,3 +2251,7 @@ key	Space	مسافة
 	The historical model detects its supported scripts automatically; Japanese is not included.	يكتشف النموذج التاريخي أنواع الكتابة المدعومة تلقائيًا؛ اليابانية غير مشمولة.
 	Historical handwriting (Kurrent)	كتابة يدوية تاريخية (Kurrent)
 	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	تتطلب الكتابة اليدوية سطورًا أفقية بالاتجاه الصحيح في عمود نص واحد. الأعمدة المتعددة والجداول والملاحظات الهامشية غير مدعومة.
+
+# Touch and pen controls
+	Touch and pen	اللمس والقلم
+	Larger drawing tools. Use two fingers to move or zoom; use Hand to move with one finger.	أدوات رسم أكبر. استخدم إصبعين للتحريك أو التكبير، أو أداة اليد للتحريك بإصبع واحد.

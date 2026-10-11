@@ -52,6 +52,16 @@ or fill colour. Names, rectangles and rotations require the single-field form. R
 
 Implemented: `initialize` (protocol 2025-06-18, 2025-03-26, 2024-11-05), `ping`, `tools/list` (with `readOnlyHint`/`destructiveHint` annotations), `tools/call` (JSON results also returned as `structuredContent`; images as `image/png`), and `resources/list`, `resources/templates/list` and `resources/read`. The resources expose the open documents read-only: `pdfcraft://doc/{doc}/info` (JSON), `…/text`, `…/page/{page}/text` and `…/page/{page}/image{?dpi}` (PNG, 1–600 dpi). Tool failures come back as `isError: true` results, so the agent can read and recover from them.
 
+## Security regression tests
+
+Run `cargo test -p pdfcraft-automation --test hostile_args -- --nocapture` for the
+hostile-argument and root-confinement sweep. On Windows without symbolic-link
+privileges (error 1314), the sweep reports that only its symlink cases are unavailable;
+all traversal and absolute-path cases still run. It never treats an ordinary path
+inside the root as a symlink escape. Windows CI sets `PDFCRAFT_REQUIRE_SYMLINK_TESTS=1`
+to require a real planted link and fail if that fixture cannot be created. Set the
+same environment variable locally when checking the full symlink coverage.
+
 ## Adding a tool
 
 1. Add the engine capability first, with its tests (the tool is a thin adapter).

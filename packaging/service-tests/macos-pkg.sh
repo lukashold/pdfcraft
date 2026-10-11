@@ -20,7 +20,8 @@ pkgbuild --component "$main" --install-location /Applications --identifier ai.st
 pkgbuild --component "$hot" --install-location /Applications --identifier ai.storyteller.pdfcraft.hot-folder.pkg \
   --version 0.6.0 --scripts "$work/scripts" "$work/components/HotFolder-component.pkg"
 sed 's/@SHORT_VERSION@/0.6.0/g' packaging/macos/Distribution.xml.in > "$work/Distribution.xml"
-productbuild --distribution "$work/Distribution.xml" --package-path "$work/components" "$work/PdfCraft.pkg"
+bash packaging/macos/prepare-resources.sh "$work/resources"
+productbuild --resources "$work/resources" --distribution "$work/Distribution.xml" --package-path "$work/components" "$work/PdfCraft.pkg"
 sudo installer -pkg "$work/PdfCraft.pkg" -target /
 test -d /Applications/PdfCraft.app
 test ! -d '/Applications/PdfCraft Hot Folder.app'

@@ -97,11 +97,25 @@ pub fn parse_pages(value: &str, count: Option<usize>) -> Result<Vec<usize>, Stri
 }
 
 pub fn prepare(bytes: Arc<Vec<u8>>, settings: &Settings, dpi: f64, should_stop: &dyn Fn() -> bool) -> Result<Arc<Vec<u8>>, String> {
+    prepare_bounded(bytes, settings, dpi, 512 * 1024 * 1024, Session::new().now_secs(), should_stop)
+}
+
+pub(crate) fn prepare_bounded(
+    bytes: Arc<Vec<u8>>,
+    settings: &Settings,
+    dpi: f64,
+    budget: u64,
+    timestamp: i64,
+    should_stop: &dyn Fn() -> bool,
+) -> Result<Arc<Vec<u8>>, String> {
     settings.validate()?;
+    if bytes.len() as u64 > budget {
+        return Err("prepared input exceeds remaining batch memory budget; use smaller batches".into());
+    }
     if !settings.changes_images() && settings.pages.trim().is_empty() {
         return Ok(bytes);
     }
-    let mut session = Session::new();
+    let mut session = Session::new().with_timestamp(timestamp);
     let id = session.open("input.pdf", None, bytes, None).map_err(|e| e.to_string())?;
     let doc = session.get(id).ok_or("document unavailable")?;
     if let Some(reason) = &doc.read_only_reason {
@@ -117,7 +131,7 @@ pub fn prepare(bytes: Arc<Vec<u8>>, settings: &Settings, dpi: f64, should_stop: 
     }
     let mut exporter = crate::export::Exporter::new(doc);
     let mut sources = Vec::new();
-    let mut total = 0usize;
+    let mut total = 0_u64;
     for page in selected {
         if should_stop() {
             return Err("task stopped during image preprocessing".into());
@@ -137,8 +151,7 @@ pub fn prepare(bytes: Arc<Vec<u8>>, settings: &Settings, dpi: f64, should_stop: 
             let image = image::imageops::crop_imm(&rgb, left, 0, width, rgb.height()).to_image();
             let mut encoded = Cursor::new(Vec::new());
             image::DynamicImage::ImageRgb8(image).write_to(&mut encoded, image::ImageFormat::Png).map_err(|e| e.to_string())?;
-            total = total.saturating_add(encoded.get_ref().len());
-            if total > 512 * 1024 * 1024 {
+            if total.saturating_add(encoded.get_ref().len() as u64) > budget {
                 return Err("prepared images exceed 512 MiB; reduce resolution or select fewer pages".into());
             }
             let name = format!("page-{}-{left}.png", page.saturating_add(1));
@@ -148,10 +161,18 @@ pub fn prepare(bytes: Arc<Vec<u8>>, settings: &Settings, dpi: f64, should_stop: 
                     crate::ImageResolution::Dpi(exporter.dpi_used(page, dpi)),
                 )
                 .map_err(|e| e.to_string())?;
+            total = total.saturating_add(pdf.len() as u64);
+            if total > budget {
+                return Err("prepared PDFs exceed remaining batch memory budget; use smaller batches".into());
+            }
             sources.push((name, pdf));
         }
     }
-    session.combine(&sources).map_err(|e| e.to_string())
+    let combined = session.combine(&sources).map_err(|e| e.to_string())?;
+    if combined.len() as u64 > budget {
+        return Err("combined prepared PDF exceeds remaining batch memory budget".into());
+    }
+    Ok(combined)
 }
 
 fn transform(image: &mut image::RgbImage, settings: &Settings) {
@@ -224,7 +245,11 @@ pub struct BlankResult {
 }
 /// Strict white-only detection retains faint marks, existing text and interactive content.
 pub fn separate_blank_pages(bytes: Arc<Vec<u8>>, should_stop: &dyn Fn() -> bool) -> Result<BlankResult, String> {
-    let mut session = Session::new();
+    separate_blank_pages_at(bytes, Session::new().now_secs(), should_stop)
+}
+
+pub(crate) fn separate_blank_pages_at(bytes: Arc<Vec<u8>>, timestamp: i64, should_stop: &dyn Fn() -> bool) -> Result<BlankResult, String> {
+    let mut session = Session::new().with_timestamp(timestamp);
     let id = session.open("scan.pdf", None, bytes.clone(), None).map_err(|e| e.to_string())?;
     let doc = session.get(id).ok_or("document unavailable")?;
     if !doc.info.annotations.is_empty() || !doc.info.fields.is_empty() || !doc.info.links.is_empty() {

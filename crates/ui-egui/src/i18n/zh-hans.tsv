@@ -2195,3 +2195,7 @@ key	Space	空格
 	The historical model detects its supported scripts automatically; Japanese is not included.	历史文字模型会自动检测其支持的字体；不包含日语。
 	Historical handwriting (Kurrent)	历史手写体（Kurrent）
 	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	手写内容必须为方向正确的水平行，且只有一列文字。不支持多列、表格和页边注释。
+
+# Touch and pen controls
+	Touch and pen	触控和笔
+	Larger drawing tools. Use two fingers to move or zoom; use Hand to move with one finger.	更大的绘图工具。使用双指移动或缩放；使用抓手工具进行单指移动。

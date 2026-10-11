@@ -2252,3 +2252,7 @@ key	Space	Пробіл
 	The historical model detects its supported scripts automatically; Japanese is not included.	Історична модель автоматично визначає підтримувані види письма; японську не включено.
 	Historical handwriting (Kurrent)	Історичний рукописний текст (курент)
 	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	Для рукопису потрібні правильно орієнтовані горизонтальні рядки в одній текстовій колонці. Кілька колонок, таблиці та примітки на полях не підтримуються.
+
+# Touch and pen controls
+	Touch and pen	Сенсорне введення та перо
+	Larger drawing tools. Use two fingers to move or zoom; use Hand to move with one finger.	Більші інструменти малювання. Двома пальцями переміщуйте сторінку або змінюйте масштаб; інструментом «Рука» переміщуйте одним пальцем.

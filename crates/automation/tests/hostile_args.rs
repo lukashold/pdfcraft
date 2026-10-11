@@ -82,7 +82,7 @@ fn zoo() -> Vec<Value> {
 /// Paths that must never resolve inside the root. Absolute ones point into the test's own temp
 /// `base` (the root's parent), never at real system files or network shares, so a confinement
 /// bug can only touch what the test made.
-fn escapes(base: &std::path::Path) -> Vec<String> {
+fn escapes(base: &std::path::Path, has_escape_link: bool) -> Vec<String> {
     let mut out: Vec<String> = vec![
         "../outside.pdf".into(),
         "../../outside.pdf".into(),
@@ -92,13 +92,41 @@ fn escapes(base: &std::path::Path) -> Vec<String> {
         base.join("outside.pdf").to_string_lossy().into_owned(),
         base.join("new-outside.pdf").to_string_lossy().into_owned(),
         base.join("sub").join("new-outside.pdf").to_string_lossy().into_owned(),
-        "link-out/outside.pdf".into(), // through a planted symbolic link, when the system allows one
     ];
+    if has_escape_link {
+        out.push("link-out/outside.pdf".into());
+    }
     // Backslashes separate only on Windows; elsewhere this is an ordinary file name in the root.
     if cfg!(windows) {
         out.push(r"..\..\outside.pdf".into());
     }
     out
+}
+
+/// Windows developers need Developer Mode or SeCreateSymbolicLinkPrivilege. Hosted Windows CI
+/// sets PDFCRAFT_REQUIRE_SYMLINK_TESTS=1 so missing privileges fail instead of reducing coverage.
+fn plant_escape_link(base: &Path, root: &Path) -> bool {
+    let link = root.join("link-out");
+    #[cfg(unix)]
+    let result = std::os::unix::fs::symlink(base, &link);
+    #[cfg(windows)]
+    let result = std::os::windows::fs::symlink_dir(base, &link);
+    #[cfg(not(any(unix, windows)))]
+    let result = Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "symlink fixture unavailable"));
+    match result {
+        Ok(()) => {
+            assert_eq!(link.canonicalize().expect("resolve planted link"), base.canonicalize().expect("resolve outside directory"));
+            true
+        }
+        Err(error) => {
+            let required = std::env::var_os("PDFCRAFT_REQUIRE_SYMLINK_TESTS").is_some_and(|v| v == "1");
+            // ERROR_PRIVILEGE_NOT_HELD is an environment limitation, not a confinement result.
+            let unavailable = cfg!(windows) && error.raw_os_error() == Some(1314);
+            assert!(unavailable && !required, "cannot create required escape-link fixture: {error}");
+            eprintln!("symlink escape cases unavailable: {error}; all traversal/absolute-path cases still run (Windows CI requires symlinks)");
+            false
+        }
+    }
 }
 
 /// The properties of `def` whose values are paths, by name and whether they are a list.
@@ -223,11 +251,9 @@ fn no_tool_escapes_the_root() {
     .expect("outside file");
     let before = listing(&base);
 
-    // A link inside the root pointing out of it, where the system allows one to be made.
-    #[cfg(unix)]
-    let _ = std::os::unix::fs::symlink(&base, root.join("link-out"));
-    #[cfg(windows)]
-    let _ = std::os::windows::fs::symlink_dir(&base, root.join("link-out"));
+    // Without the Windows symlink privilege, this would be an ordinary path inside root.
+    // Only add it to the escape cases if the link actually exists. CI requires the real link.
+    let has_escape_link = plant_escape_link(&base, &root);
 
     let mut a = Automation::new().with_root(&root).expect("root");
 
@@ -247,7 +273,7 @@ fn no_tool_escapes_the_root() {
 
     for def in tools() {
         for (prop, is_list) in path_props(&def) {
-            for escape in escapes(&base) {
+            for escape in escapes(&base, has_escape_link) {
                 let mut obj = plausible_with(&def, Some(doc));
                 obj.insert(prop.clone(), if is_list { json!([escape]) } else { json!(escape) });
                 let args = Value::Object(obj);

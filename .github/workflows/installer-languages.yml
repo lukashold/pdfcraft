@@ -1,0 +1,45 @@
+name: Installer languages
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'packaging/**'
+      - '.github/workflows/installer-languages.yml'
+  push:
+    branches: [main, codex/installer-languages]
+    paths:
+      - 'packaging/**'
+      - '.github/workflows/installer-languages.yml'
+permissions:
+  contents: read
+jobs:
+  windows:
+    name: Offline Setup and MSI (${{ matrix.arch }})
+    runs-on: windows-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64, x86]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Install pinned WiX build tool
+        run: dotnet tool install --global wix --version 5.0.2
+      - name: Catalog parity and codepages
+        run: python packaging/test-installer-languages.py
+      - name: Build and inspect all seven languages (no installation)
+        shell: pwsh
+        run: ./packaging/windows/test-language-build.ps1 -Arch ${{ matrix.arch }} -Work "$env:RUNNER_TEMP/installer-language-fixture"
+  macos:
+    name: Native localized PKG
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Catalog parity and codepages
+        run: python3 packaging/test-installer-languages.py
+      - name: Build PKG and inspect native locale resolution (no installation)
+        run: bash packaging/macos/test-localized-pkg.sh "$RUNNER_TEMP/installer-language-fixture"

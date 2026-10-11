@@ -2231,3 +2231,7 @@ key	Space	スペース
 	The historical model detects its supported scripts automatically; Japanese is not included.	歴史的文字モデルは対応する書体を自動検出します。日本語は含まれていません。
 	Historical handwriting (Kurrent)	歴史的な手書き文字（クレント）
 	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	手書き文字は、正しい向きの横書き行が1列に並んでいる必要があります。複数列、表、余白の注記には対応していません。
+
+# Touch and pen controls
+	Touch and pen	タッチとペン
+	Larger drawing tools. Use two fingers to move or zoom; use Hand to move with one finger.	描画ツールを大きく表示します。2本指で移動やズーム、手のひらツールで1本指による移動ができます。

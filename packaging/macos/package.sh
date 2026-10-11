@@ -165,10 +165,12 @@ if [ -n "${MACOS_INSTALLER_SIGN_IDENTITY:-}" ]; then
 else
   warn "PKG has no Developer ID Installer signature (MACOS_INSTALLER_SIGN_IDENTITY is unset)"
 fi
-productbuild --distribution "$WORK/Distribution.xml" --package-path "$WORK/components" \
+bash "$HERE/prepare-resources.sh" "$WORK/installer-resources"
+productbuild --resources "$WORK/installer-resources" --distribution "$WORK/Distribution.xml" --package-path "$WORK/components" \
   ${installer_signature[@]+"${installer_signature[@]}"} "$PKG"
 pkgutil --expand "$PKG" "$WORK/pkg-check"
 test -f "$WORK/pkg-check/Distribution"
+osascript "$HERE/test-localization.applescript" "$WORK/pkg-check/Resources"
 if [ "$NOTARIZE" = 1 ] && [ -n "${MACOS_INSTALLER_SIGN_IDENTITY:-}" ]; then
   notarize "$PKG"
   xcrun stapler staple "$PKG"

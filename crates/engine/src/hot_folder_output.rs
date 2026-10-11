@@ -157,6 +157,17 @@ impl OutputPlan {
     /// Validate before reading source files. The caller also checks destinations against
     /// its full set of input folders to prevent recursive output/input loops.
     pub fn validate(&self, default_output: &Path, root: Option<&Path>) -> Result<(), String> {
+        self.validate_settings()?;
+        for step in &self.steps {
+            let folder = confined(step.folder.as_deref().unwrap_or(default_output), root)?;
+            if !folder.is_dir() {
+                return Err(format!("output folder does not exist: {}", folder.display()));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn validate_settings(&self) -> Result<(), String> {
         if self.steps.is_empty() || self.steps.len() > 16 {
             return Err("choose between 1 and 16 output saving steps".into());
         }
@@ -167,10 +178,6 @@ impl OutputPlan {
             validate_template(&step.name_template)?;
             if step.language.is_empty() || step.language.len() > 63 || !step.language.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
                 return Err("EPUB language must be a language tag such as de-AT or und".into());
-            }
-            let folder = confined(step.folder.as_deref().unwrap_or(default_output), root)?;
-            if !folder.is_dir() {
-                return Err(format!("output folder does not exist: {}", folder.display()));
             }
         }
         Ok(())
@@ -203,6 +210,9 @@ pub struct OutputProof {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OutputError {
     pub message: String,
+    /// A filesystem publication/staging failure can recover without changing the input.
+    #[serde(default)]
+    pub retryable: bool,
     /// Complete files already published (or reused after byte-identical comparison).
     /// No source action is permitted after this error, even when this list is nonempty.
     pub outputs: Vec<PathBuf>,
@@ -227,13 +237,14 @@ pub fn save(
     should_stop: &dyn Fn() -> bool,
 ) -> Result<OutputReceipt, OutputError> {
     let mut receipt = OutputReceipt::default();
+    let mut retryable = false;
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        save_inner(inputs, default_output, plan, task_name, batch_time, root, should_stop, &mut receipt)
+        save_inner(inputs, default_output, plan, task_name, batch_time, root, should_stop, &mut receipt, &mut retryable)
     }));
     match result {
         Ok(Ok(())) => Ok(receipt),
-        Ok(Err(message)) => Err(OutputError { message, outputs: receipt.outputs }),
-        Err(_) => Err(OutputError { message: "output conversion failed unexpectedly".into(), outputs: receipt.outputs }),
+        Ok(Err(message)) => Err(OutputError { message, outputs: receipt.outputs, retryable }),
+        Err(_) => Err(OutputError { message: "output conversion failed unexpectedly".into(), outputs: receipt.outputs, retryable: false }),
     }
 }
 
@@ -298,8 +309,11 @@ fn save_inner(
     root: Option<&Path>,
     should_stop: &dyn Fn() -> bool,
     receipt: &mut OutputReceipt,
+    retryable: &mut bool,
 ) -> Result<(), String> {
+    *retryable = true;
     plan.validate(default_output, root)?;
+    *retryable = false;
     if inputs.is_empty() || inputs.len() > 10_000 || inputs.iter().any(|input| !relative_ok(&input.relative)) {
         return Err("output batch needs 1..10000 inputs with relative paths containing normal components only".into());
     }
@@ -314,24 +328,28 @@ fn save_inner(
     let mut staged = Vec::new();
     let mut staged_bytes = 0_u64;
     for step in &plan.steps {
+        *retryable = true;
         let base = confined(step.folder.as_deref().unwrap_or(default_output), root)?;
+        *retryable = false;
         for (index, group) in groups(inputs, step.grouping, task_name).into_iter().enumerate() {
             stopped(should_stop)?;
+            *retryable = true;
             let folder = safe_subfolder(&base, &group.subfolder)?;
+            *retryable = false;
             let stem = expand_name(&step.name_template, &group.name, &group.folder_name, task_name, timestamp, index.saturating_add(1))?;
             let bytes = if let [input] = group.inputs.as_slice() {
                 input.bytes.clone()
             } else {
                 let sources =
                     group.inputs.iter().map(|input| (input.relative.to_string_lossy().into_owned(), input.bytes.clone())).collect::<Vec<_>>();
-                Session::new().combine(&sources).map_err(|error| error.to_string())?
+                Session::new().with_timestamp(timestamp.timestamp()).combine(&sources).map_err(|error| error.to_string())?
             };
             if step.format == Format::Analysis {
                 let report = crate::hot_folder_analysis::analyze(bytes.as_slice(), &[], should_stop)?;
-                stage(&mut staged, &mut staged_bytes, &folder, &stem, "json", &report)?;
+                stage(&mut staged, &mut staged_bytes, &folder, &stem, "json", &report, retryable)?;
                 continue;
             }
-            let mut session = Session::new();
+            let mut session = Session::new().with_timestamp(timestamp.timestamp());
             let id = session.open(format!("{stem}.pdf"), None, bytes.clone(), None).map_err(|error| error.to_string())?;
             let document = session.get(id).ok_or("output document unavailable")?;
             let pages = document.info.pages.len();
@@ -351,6 +369,7 @@ fn save_inner(
                         &format!("{stem}_page_{:04}", page.saturating_add(1)),
                         step.format.extension(),
                         &bytes,
+                        retryable,
                     )?;
                 }
             } else {
@@ -359,6 +378,7 @@ fn save_inner(
                     Format::ImagePdf => {
                         let mut sources = Vec::new();
                         let mut images_size = 0_u64;
+                        let mut prepared_size = 0_u64;
                         for page in 0..pages {
                             stopped(should_stop)?;
                             warn_resolution(&exporter, page, step.dpi, &stem, receipt);
@@ -374,6 +394,10 @@ fn save_inner(
                                     crate::ImageResolution::Dpi(exporter.dpi_used(page, step.dpi)),
                                 )
                                 .map_err(|error| error.to_string())?;
+                            prepared_size = prepared_size.saturating_add(pdf.len() as u64);
+                            if prepared_size > MAX_INPUT_BYTES {
+                                return Err("prepared image-only PDF exceeds 512 MiB; lower the resolution".into());
+                            }
                             sources.push((format!("page-{}.pdf", page.saturating_add(1)), pdf));
                         }
                         session.combine(&sources).map_err(|error| error.to_string())?
@@ -386,7 +410,7 @@ fn save_inner(
                     Format::Epub => Arc::new(pdfcraft_export::epub(&document.export_pages(), &stem, &step.language)?),
                     Format::Png | Format::Jpeg | Format::Tiff | Format::Analysis => return Err("invalid output state".into()),
                 };
-                stage(&mut staged, &mut staged_bytes, &folder, &stem, step.format.extension(), output.as_slice())?;
+                stage(&mut staged, &mut staged_bytes, &folder, &stem, step.format.extension(), output.as_slice(), retryable)?;
             }
         }
     }
@@ -395,7 +419,9 @@ fn save_inner(
         stopped(should_stop)?;
         let bytes = file.size;
         let sha256 = file.sha256.clone();
+        *retryable = true;
         let path = publish(file, root)?;
+        *retryable = false;
         receipt.proofs.push(OutputProof { path: path.clone(), bytes, sha256 });
         receipt.outputs.push(path);
     }
@@ -420,13 +446,23 @@ fn digest(bytes: &[u8]) -> String {
     Sha256::digest(bytes).iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
-fn stage(staged: &mut Vec<Staged>, total: &mut u64, folder: &Path, stem: &str, extension: &'static str, bytes: &[u8]) -> Result<(), String> {
+fn stage(
+    staged: &mut Vec<Staged>,
+    total: &mut u64,
+    folder: &Path,
+    stem: &str,
+    extension: &'static str,
+    bytes: &[u8],
+    retryable: &mut bool,
+) -> Result<(), String> {
     *total = total.saturating_add(bytes.len() as u64);
     if bytes.is_empty() || *total > MAX_STAGED_BYTES || staged.len() >= MAX_OUTPUT_FILES {
         return Err("output batch exceeds 1 GiB or 10000 files, or an exporter returned an empty file; use smaller batches".into());
     }
+    *retryable = true;
     let mut file = tempfile::Builder::new().prefix(".pdfcraft-output-").tempfile_in(folder).map_err(|error| error.to_string())?;
     file.write_all(bytes).and_then(|_| file.as_file().sync_all()).map_err(|error| format!("cannot stage output: {error}"))?;
+    *retryable = false;
     staged.push(Staged { file, folder: folder.to_owned(), stem: stem.to_owned(), extension, size: bytes.len() as u64, sha256: digest(bytes) });
     Ok(())
 }

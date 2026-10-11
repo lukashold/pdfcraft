@@ -1,6 +1,6 @@
 # PdfCraft Hot Folder
 
-**Status: implemented native workflow, in final integration review. Proprietary ABBYY task/project formats are not compatible.**
+**Status: implemented native workflow, with isolated task workers and durable restart recovery. Platform package acceptance is documented separately. Proprietary ABBYY task/project formats are not compatible.**
 
 The optional standalone application processes folders without keeping the PdfCraft editor open.
 It shares OCR, orientation correction, deskew and paper-edge detection with the engine. Its
@@ -41,8 +41,11 @@ independently from the system language, using the shared OCR language list.
 - Analyze-only mode writes versioned JSON reports with existing text, geometry, image rectangles and metadata. It bypasses OCR, scan corrections and blank-page removal, and supports the selected page range. An analysis saving step after normal processing describes the resulting PDF; the analyzer itself never runs OCR.
 - Optional blank-page archives preserve removed pages as separate PDFs; originals are not removed
   until these files also save successfully. An entirely blank input requires an archive destination.
-- Durable receipts suppress duplicate processing across worker restarts. Failed files are logged
-  once, retried when their content changes or through Retry/Start. Stop is checked between pages
+- Durable receipts suppress duplicate processing across worker restarts. Transient filesystem,
+  publication and task-process failures retry automatically with bounded exponential backoff
+  (5 seconds up to 15 minutes); one offline task does not block the others. A malformed unchanged
+  input is quarantined until its contents change or Retry/Start is requested. A permanently failed
+  group stays blocked rather than silently omitting one member. Stop is checked between pages
   and does not save partial OCR output. Editing a running task through automation or its configuration
   file also cancels the previous settings snapshot, including a change from Delete to Keep.
 - Import/export task JSON, duplicate tasks, inspect the last 1,000 log events, filter failures and
@@ -60,6 +63,7 @@ settling time or have the producer rename the completed file into the input fold
 `pdfcraft-hot-folder --once --config tasks.json` executes one scheduler pass and prints JSON.
 `pdfcraft-hot-folder --service --config tasks.json` hosts the installed system service.
 `--service-action status|start|stop|enable|disable|install|uninstall` explicitly administers it.
+Windows `prepare-account` reapplies service SID/recovery policy without changing the SCM account.
 Unix installation additionally requires `--account USER`, a non-root service account.
 Unix processing refuses root; elevated execution is reserved for setup and administration.
 `--initialize-config --config PATH` atomically creates a stopped configuration without replacing
@@ -82,7 +86,8 @@ variable, Outlook device sign-in and folder listing. Secrets never appear in too
 ## Remote credentials and mail handling
 
 The service uses a separate protected `secrets` directory next to its configuration. Windows
-installation restricts this to SYSTEM, Administrators and LocalService. Unix requires the service
+installation restricts this to SYSTEM, Administrators, LocalService and the fixed service SID.
+A separately configured SCM service account is validated by its actual OS SID, not a task-JSON name. Unix requires the service
 account as owner and permissions 0700 for the directory and 0600 for files. Unsafe permissions,
 symlinks and missing provisioning are rejected instead of falling back to an unprotected file.
 Set up credentials under the service identity, or use an administrator task-manager session
@@ -120,10 +125,26 @@ Example task (folders must already exist):
 }
 ```
 
-`tasks.state.json` stores receipts, queue observations and logs. `tasks.lock` and
-`tasks.worker.lock` are OS locks, released automatically after a crash. Corrupt JSON is reported
-without resetting or overwriting it. Do not delete the journal unless you intentionally want
-to process inputs again. Keep it together with its configuration when archiving a completed job.
+`tasks.state.json` keeps the active receipts/observations bounded to 256 entries and 2 MiB
+per map; logs keep at most 1,000 events and 1 MiB. Exact historical records spill to sharded
+files under `tasks.journal`, so keeping more than 10,000 originals does not stop the queue.
+Disk history grows with each distinct source version; provision disk space accordingly.
+`tasks.state.pending.json` is the atomic write-ahead snapshot: recovery exposes all grouped
+receipts together even if the process died during history spill. Output names and PDF
+metadata use the persisted attempt timestamp, making replayed OCR/export byte-identical.
+
+`tasks.lock` and `tasks.worker.lock` are OS locks, released automatically after a crash.
+Corrupt JSON is reported without resetting or overwriting it. Back up the configuration,
+state, pending state and complete journal together. Do not remove individual history files
+to free space: doing so discards deduplication evidence. Configuration, journals and worker
+limits belong on local storage; input/output folders may be network shares.
+
+The parent service delegates each due task to a bounded child process. The default is
+300 seconds and 4096 MiB per child; see [installation and limits](hot-folder-installation.md).
+Windows enforces a Job Object commit-memory limit and kills children if the parent dies.
+Unix samples resident memory; it does not promise an equivalent kernel commit limit.
+An idle pass does not rewrite unchanged state. Updating one manifest cannot newly overlap
+another active task's source or output paths.
 
 ## Functional reference and remaining scope
 

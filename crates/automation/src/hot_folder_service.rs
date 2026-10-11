@@ -22,7 +22,8 @@ impl Automation {
             "disable" => service::set_enabled(false, &executable, &config).map_err(failed)?,
             "install" => service::install(&executable, &config, args.str("account")?).map_err(failed)?,
             "uninstall" => service::uninstall(&executable, &config).map_err(failed)?,
-            _ => return Err(failed("action must be status, start, stop, enable, disable, install or uninstall")),
+            "prepare-account" => service::prepare_account(&executable, &config).map_err(failed)?,
+            _ => return Err(failed("action must be status, start, stop, enable, disable, install, uninstall or prepare-account")),
         }
         serde_json::to_value(service::status(&executable, &config).map_err(failed)?).map_err(failed)
     }
@@ -43,7 +44,7 @@ mod tests {
         let root = std::env::temp_dir();
         let mut automation = Automation::new();
         automation.root = Some(root);
-        for action in ["start", "stop", "enable", "disable", "install", "uninstall"] {
+        for action in ["start", "stop", "enable", "disable", "install", "uninstall", "prepare-account"] {
             let value = json!({"action":action,"executable":"unneeded","config":"unneeded","account":"root"});
             assert!(automation.hot_folder_service(&Args(&value)).unwrap_err().to_string().contains("confined"));
         }

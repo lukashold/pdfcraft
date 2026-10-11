@@ -94,6 +94,18 @@ pub fn uninstall(executable: &Path, config: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Prepare the installed Windows service for an administrator-managed logon account.
+/// Does not change credentials, start the service, or grant access to watched folders.
+pub fn prepare_account(executable: &Path, config: &Path) -> Result<(), String> {
+    if !status(executable, config)?.installed {
+        return Err("Install the optional Hot Folder system service first".into());
+    }
+    #[cfg(windows)]
+    return windows::prepare_account();
+    #[cfg(not(windows))]
+    Err("prepare-account is a Windows service administration action".into())
+}
+
 /// Blocking service host. The worker must check the cancellation flag between pages.
 pub fn run(config: &Path, worker: Worker) -> Result<(), String> {
     path_text(config)?;

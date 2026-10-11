@@ -2238,3 +2238,7 @@ key	Space	Spazio
 	The historical model detects its supported scripts automatically; Japanese is not included.	Il modello storico rileva automaticamente le scritture supportate; il giapponese non è incluso.
 	Historical handwriting (Kurrent)	Scrittura a mano storica (Kurrent)
 	Handwriting requires upright horizontal lines in one text column. Columns, tables and marginal notes are not supported.	La scrittura a mano richiede righe orizzontali orientate correttamente in una sola colonna. Non sono supportate più colonne, tabelle e note a margine.
+
+# Touch and pen controls
+	Touch and pen	Tocco e penna
+	Larger drawing tools. Use two fingers to move or zoom; use Hand to move with one finger.	Strumenti di disegno più grandi. Usa due dita per spostare o ingrandire, oppure lo strumento Mano per spostare con un dito.

@@ -133,6 +133,12 @@ Ranked; detail and the full milestone table in [docs/roadmap.md](docs/roadmap.md
 
 ## Progress log
 
+- 2026-10-11 — M5: shared touch/pen toolbar, persistent Auto/On/Off preference, intra-frame ink sampling, pen dots and two-finger navigation without accidental marks. Synthetic GUI and saved-PDF regressions; physical-device, pressure and palm-rejection claims remain excluded. See [touch and pen](docs/touch-and-pen.md).
+
+- **2026-10-11 (M14, combined preview .5):** Prepare the hardened Hot Folder service and seven-language offline Windows Setup/MSI and native macOS PKG dialogs for combined preview builds. Preserve opt-in service/model choices, historical OCR, fork branding and embedded-font notices; actual server acceptance remains a separate artifact-backed workflow.
+
+- 2026-10-11 — M13: Hot Folder server hardening: isolated bounded task processes, Windows job memory limits, automatic transient retries, durable bounded active journals, crash-safe grouped receipts and deterministic OCR replay. Stable service SID grants preserve custom SCM accounts through repair/upgrade. Added manual real-MSI local/SMB acceptance for Server 2022/2025 and opt-in disposable Server 2019; no untested server certification is claimed.
+
 - **2026-10-11 (M14, combined preview .4):** Integrate optional historical OCR and the standalone Hot Folder application into Windows x64/ARM64 and universal macOS preview packaging. Preserve fork branding, embedded-font notices and opt-in model downloads. The shared OCR settings retain historical profile IDs through task JSON while older tasks default to modern recognition.
 
 - **2026-10-11 (M14, final preview refresh):** Build 0.6.0-preview.20261011.3 installers with all twelve OCR language choices and system-language defaults, retaining the organizer and scan correction/crop features. Preview signing and official release status are unchanged.
