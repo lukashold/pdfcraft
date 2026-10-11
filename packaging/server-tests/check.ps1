@@ -51,6 +51,21 @@ try {
     $report = Join-Path $script:TestRoot 'report.json'
     Write-Json $report @{ result = 'passed'; tests = @{} }
     Assert-That ([IO.File]::ReadAllText($report).TrimStart().StartsWith('{')) 'Reports must remain JSON objects.'
+
+    # A successful output or stopped process is insufficient if an original was
+    # removed or modified. Both failures must reject the whole acceptance result.
+    $source = Join-Path $script:TestRoot 'original.bin'
+    [IO.File]::WriteAllText($source, 'original synthetic bytes')
+    $sourceHash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
+    Assert-SourceUnchanged $source $sourceHash 'Unchanged fixture'
+    [IO.File]::WriteAllText($source, 'changed synthetic bytes')
+    $rejected = $false
+    try { Assert-SourceUnchanged $source $sourceHash 'Changed fixture' } catch { $rejected = $true }
+    Assert-That $rejected 'Changed source bytes must fail acceptance.'
+    Remove-Item -LiteralPath $source
+    $rejected = $false
+    try { Assert-SourceUnchanged $source $sourceHash 'Missing fixture' } catch { $rejected = $true }
+    Assert-That $rejected 'A missing source must fail acceptance.'
 } finally {
     [void] (Assert-SafePath $script:TestRoot ([IO.Path]::GetTempPath()))
     Remove-Item -LiteralPath $script:TestRoot -Recurse -Force
@@ -105,5 +120,5 @@ try {
     if ($previousCase) { $global:PdfcraftServerProvenanceCase = $previousCase.Value }
     else { Remove-Variable -Name PdfcraftServerProvenanceCase -Scope Global }
 }
-Write-Output 'ok: parser, safe-path confinement, JSON script cardinality and eight provenance scenarios; no service or installer executed'
+Write-Output 'ok: parser, safe-path confinement, JSON script cardinality, source preservation and eight provenance scenarios; no service or installer executed'
 if ($Cli) { Write-Output 'ok: real CLI executed empty, single and multiple read-only status scripts' }

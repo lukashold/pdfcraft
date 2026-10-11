@@ -187,11 +187,14 @@ try {
     Wait-For 'source deleted only after both outputs' { -not (Test-Path -LiteralPath (Join-Path $faultIn 'write-denied.pdf')) } 30
     Record 'output_failure_isolated_and_auto_retried' @{ independent_task_completed = $true; no_manual_retry = $true; source_kept_until_outputs = $true }
 
-    [IO.File]::WriteAllText((Join-Path $localIn 'broken.pdf'), "%PDF-1.7`nnot a valid PDF", [Text.Encoding]::ASCII)
+    $brokenPath = Join-Path $localIn 'broken.pdf'
+    [IO.File]::WriteAllText($brokenPath, "%PDF-1.7`nnot a valid PDF", [Text.Encoding]::ASCII)
+    $brokenHash = (Get-FileHash -LiteralPath $brokenPath -Algorithm SHA256).Hash
     Put-Scan $localIn 'after-broken-document'
     Wait-For 'permanent malformed-document error' { (Read-State).tasks.local.failed -gt 0 } 90
     Wait-Output $localOut 'after-broken-document' 90
-    Record 'malformed_document_does_not_block_next_file' @{ malformed_source_retained = (Test-Path -LiteralPath (Join-Path $localIn 'broken.pdf')); valid_next_file_completed = $true }
+    Assert-SourceUnchanged $brokenPath $brokenHash 'Malformed-document handling'
+    Record 'malformed_document_does_not_block_next_file' @{ malformed_source_retained = $true; source_unchanged = $true; valid_next_file_completed = $true }
 
     Put-Scan $localIn 'crash-recovery' $largeScan
     $largeHash = (Get-FileHash -LiteralPath $largeScan).Hash
@@ -215,7 +218,8 @@ try {
     $stopSeconds = Stop-HotService 35
     Wait-For 'stopped service child gone' { -not (Get-Process -Id $stopChild -ErrorAction SilentlyContinue) } 10
     Assert-That ($stopSeconds -lt 35) 'Service stop exceeded the acceptance bound.'
-    Record 'bounded_stop_during_ocr' @{ seconds = $stopSeconds; source_retained = (Test-Path -LiteralPath (Join-Path $localIn 'bounded-stop.pdf')) }
+    Assert-SourceUnchanged (Join-Path $localIn 'bounded-stop.pdf') $largeHash 'Stopping during OCR'
+    Record 'bounded_stop_during_ocr' @{ seconds = $stopSeconds; source_retained = $true; source_unchanged = $true }
 
     # A filesystem error during worker initialization returns Err rather than a
     # crash. Recovery must include non-crash exits, without a manual second start.
@@ -274,7 +278,8 @@ try {
     $sessions = @(Get-SmbSession | Where-Object { $_.ClientUserName -ieq $account })
     Assert-That ($sessions.Count -gt 0) 'No SMB session authenticated as the configured service account.'
     Assert-That (Get-SmbShare -Name $shareName).EncryptData 'The test share must require SMB encryption.'
-    Record 'authenticated_smb_ocr' @{ account = $account; encrypted_share = $true; authenticated_sessions = $sessions.Count; source_unchanged = ((Get-FileHash -LiteralPath (Join-Path $smbIn 'authenticated-smb.pdf')).Hash -eq $scanHash) }
+    Assert-SourceUnchanged (Join-Path $smbIn 'authenticated-smb.pdf') $scanHash 'Authenticated SMB OCR'
+    Record 'authenticated_smb_ocr' @{ account = $account; encrypted_share = $true; authenticated_sessions = $sessions.Count; source_unchanged = $true }
     Remove-SmbShare -Name $shareName -Force
     Put-Scan $smbIn 'after-share-outage'
     Wait-For 'unavailable UNC recorded for affected task' { [bool] (Read-State).tasks.smb.error } 60

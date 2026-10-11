@@ -94,7 +94,8 @@ Local validation without installation
   actionlint -config-file packaging/server-tests/actionlint.yaml \
     .github/workflows/hot-folder-server.yml
 check.ps1 parses scripts, exercises confinement, preserves empty/single/multiple
-CLI-script arrays, and mocks the GitHub metadata verifier. The optional -Cli check
+CLI-script arrays, rejects missing or changed originals, and mocks the GitHub
+metadata verifier. The optional -Cli check
 also executes those scripts with the existing CLI, using only the read-only
 ocr_status tool. It never runs acceptance.ps1 or accesses a real service/account/share.
 

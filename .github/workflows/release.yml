@@ -167,6 +167,13 @@ jobs:
           CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
           CRAFT_FONTS_REQUIRED: "1"
         run: ./packaging/windows/package.ps1 -Arch ${{ matrix.arch }}
+      - name: Checksum the finished Windows installer
+        shell: pwsh
+        run: |
+          $msi = @(Get-ChildItem -Path 'dist/release/*.msi' -File)
+          if ($msi.Count -ne 1) { throw 'Expected one finished MSI.' }
+          $hash = (Get-FileHash -LiteralPath $msi[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $($msi[0].Name)" | Set-Content -Encoding ascii "$($msi[0].FullName).sha256"
       - uses: actions/upload-artifact@v4
         with:
           name: release-windows-${{ matrix.arch }}

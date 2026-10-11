@@ -4,6 +4,11 @@ function Assert-That([bool] $Condition, [string] $Message) {
     if (-not $Condition) { throw $Message }
 }
 
+function Assert-SourceUnchanged([string] $Path, [string] $ExpectedHash, [string] $Context) {
+    Assert-That (Test-Path -LiteralPath $Path -PathType Leaf) "$Context removed the original source."
+    Assert-That ((Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash -eq $ExpectedHash) "$Context changed the original source bytes."
+}
+
 function Write-Json([string] $Path, $Value) {
     # The CLI requires a JSON array even when a script has zero or one step.
     [IO.File]::WriteAllText($Path, (ConvertTo-Json -InputObject $Value -Depth 40), [Text.UTF8Encoding]::new($false))
@@ -97,7 +102,7 @@ function New-Task([string] $Id, [string] $InputFolder, [string] $OutputFolder, [
     return @{
         id = $Id; name = $Id; input = $InputFolder; output = $OutputFolder
         enabled = $true; interval_seconds = 1; settle_seconds = 1; originals = $Originals
-        settings = @{ language = 'en'; recognizer = 'modern'; recognize = $true; dpi = 150; auto_rotate = $false; deskew = $false; auto_crop = $false }
+        settings = @{ language = 'en'; recognize = $true; dpi = 150; auto_rotate = $false; deskew = $false; auto_crop = $false }
         output_plan = @{ steps = @(@{ format = 'pdf' }, @{ format = 'txt' }) }
     }
 }
