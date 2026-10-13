@@ -194,6 +194,31 @@ fn scan_deskew_without_ocr_persists_and_is_undoable() {
 }
 
 #[test]
+fn corrected_scan_does_not_duplicate_existing_ocr_text() {
+    if !ocr::available() {
+        eprintln!("skipped: run cargo xtask models");
+        return;
+    }
+    let sentence = (0..12).map(|_| "Document orientation keeps these searchable words in place.\n").collect::<String>();
+    for (rotation, skew) in [(90, 0.0), (0, 3.0)] {
+        let (mut s, id) = scan(&sentence, rotation, skew);
+        let settings = OcrSettings { skip_text_pages: false, ..Default::default() };
+        let first = s.ocr_job(id, &[], settings.clone()).unwrap().run(&ocr::engine().unwrap(), |_, _| true);
+        assert!(!first[0].words.is_empty());
+        assert!(first[0].correction.changed());
+        // Install only the text layer in original coordinates, leaving the scan uncorrected.
+        s.apply(id, Edit::AddOcrText { page: 0, words: first[0].words.clone() }).unwrap();
+        let next = s.recognize_text(id, &[], settings).unwrap();
+        assert!(next[0].words.is_empty(), "existing words must not be added twice: {:?}", next[0]);
+        assert!(next[0].already_on_page > 0);
+        assert!(next[0].correction.changed());
+        let saved = s.save_bytes(id).unwrap();
+        let reopened = s.open("corrected.pdf", None, saved, None).unwrap();
+        assert_eq!(text(&s, reopened).matches("Document").count(), 12);
+    }
+}
+
+#[test]
 fn scan_recognizes_accents_in_requested_languages() {
     if !ocr::available() {
         return;
