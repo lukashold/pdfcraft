@@ -21,6 +21,10 @@ pkgbuild --component "$hot" --install-location /Applications --identifier ai.sto
   --version 0.6.0 --scripts "$work/scripts" "$work/components/HotFolder-component.pkg"
 sed 's/@SHORT_VERSION@/0.6.0/g' packaging/macos/Distribution.xml.in > "$work/Distribution.xml"
 productbuild --distribution "$work/Distribution.xml" --package-path "$work/components" "$work/PdfCraft.pkg"
+# The components are relocatable: Installer may update a bundle with the same identifier where
+# it already is, and the staged copies above are such bundles. Remove them so every install
+# below goes to /Applications.
+rm -rf "$hot" "$main"
 sudo installer -pkg "$work/PdfCraft.pkg" -target /
 test -d /Applications/PdfCraft.app
 test ! -d '/Applications/PdfCraft Hot Folder.app'
