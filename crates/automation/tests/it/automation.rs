@@ -6355,6 +6355,60 @@ fn ocr_recognize_files_writes_searchable_copies() {
     assert!(found.to_string().contains("\"page\""), "{found}");
 }
 
+/// Two inputs that share a file name (from different folders) would both write `out/scan.pdf`:
+/// the second output replaces the first while both results report success. The batch is refused
+/// up front, naming the file, before the folder is created, anything is read or the OCR engines
+/// load, so the outcome is the same with or without the models installed.
+#[test]
+fn ocr_recognize_files_refuses_inputs_that_share_a_file_name() {
+    let dir = workdir("ocr-files-same-name");
+    let mut a = auto(&dir);
+    let doc = ok(&mut a, "doc_open", json!({ "path": "a.pdf" }))["doc"].as_u64().unwrap();
+    ok(&mut a, "doc_save", json!({ "doc": doc, "path": "one/scan.pdf" }));
+    ok(&mut a, "doc_save", json!({ "doc": doc, "path": "two/scan.pdf" }));
+    let r = a.call("ocr_recognize_files", &json!({ "paths": ["one/scan.pdf", "two/scan.pdf"], "folder": "out" }));
+    assert!(matches!(&r, Err(ToolError::InvalidArgs(m)) if m.contains("scan.pdf")), "{r:?}");
+    assert!(!dir.join("out").exists(), "nothing was started: the output folder was not created");
+}
+
+/// File names are compared without regard to case on Windows and macOS (`scan.pdf` and `Scan.PDF`
+/// are one file there), and exactly elsewhere, where they are two files and the batch is not
+/// refused.
+#[test]
+fn ocr_recognize_files_compares_names_the_way_the_filesystem_does() {
+    let dir = workdir("ocr-files-case");
+    let mut a = auto(&dir);
+    let doc = ok(&mut a, "doc_open", json!({ "path": "a.pdf" }))["doc"].as_u64().unwrap();
+    ok(&mut a, "doc_save", json!({ "doc": doc, "path": "one/scan.pdf" }));
+    ok(&mut a, "doc_save", json!({ "doc": doc, "path": "two/Scan.PDF" }));
+    let r = a.call("ocr_recognize_files", &json!({ "paths": ["one/scan.pdf", "two/Scan.PDF"], "folder": "out" }));
+    if cfg!(any(windows, target_os = "macos")) {
+        assert!(matches!(&r, Err(ToolError::InvalidArgs(m)) if m.contains("Scan.PDF")), "{r:?}");
+        assert!(!dir.join("out").exists(), "nothing was started: the output folder was not created");
+    } else {
+        assert!(!matches!(&r, Err(ToolError::InvalidArgs(_))), "{r:?}");
+    }
+}
+
+/// Inputs with distinct names are not refused, and the batch writes one searchable copy per input
+/// under its own name. Without the models it stops at the models error, as it did before.
+#[test]
+fn ocr_recognize_files_with_distinct_names_runs_as_before() {
+    let dir = workdir("ocr-files-distinct");
+    let mut a = auto(&dir);
+    let doc = ok(&mut a, "doc_open", json!({ "path": "a.pdf" }))["doc"].as_u64().unwrap();
+    ok(&mut a, "doc_save", json!({ "doc": doc, "path": "one/scan.pdf" }));
+    ok(&mut a, "doc_save", json!({ "doc": doc, "path": "two/other.pdf" }));
+    if ok(&mut a, "ocr_status", json!({}))["available"] == true {
+        let r = ok(&mut a, "ocr_recognize_files", json!({ "paths": ["one/scan.pdf", "two/other.pdf"], "folder": "out" }));
+        assert!(r["files"][0]["error"].is_null() && r["files"][1]["error"].is_null(), "{r}");
+        assert!(dir.join("out/scan.pdf").is_file() && dir.join("out/other.pdf").is_file(), "{r}");
+    } else {
+        let r = a.call("ocr_recognize_files", &json!({ "paths": ["one/scan.pdf", "two/other.pdf"], "folder": "out" }));
+        assert!(matches!(&r, Err(ToolError::Failed(m)) if m.contains("not installed")), "{r:?}");
+    }
+}
+
 #[test]
 fn javascript_through_tools() {
     let dir = workdir("js");
@@ -8459,6 +8513,46 @@ fn a_root_less_write_output_is_atomic_too() {
 }
 
 #[test]
+fn attaching_and_deleting_files_through_the_tools() {
+    let dir = workdir("attach");
+    std::fs::write(dir.join("notes.txt"), b"keep this with the PDF").unwrap();
+    let mut a = auto(&dir);
+    let doc = ok(&mut a, "doc_open", json!({ "path": "a.pdf" }))["doc"].as_u64().unwrap();
+    assert!(ok(&mut a, "doc_info", json!({ "doc": doc }))["attachments"].as_array().unwrap().is_empty());
+    // A text file and a PDF, the PDF under a name of its own; the second notes.txt is kept apart.
+    let r = ok(&mut a, "attachment_add", json!({ "doc": doc, "path": "notes.txt", "description": "Meeting notes" }));
+    assert_eq!(r["name"], "notes.txt");
+    let r = ok(&mut a, "attachment_add", json!({ "doc": doc, "path": "b.pdf", "name": "annex.pdf" }));
+    assert_eq!(r["name"], "annex.pdf");
+    let r = ok(&mut a, "attachment_add", json!({ "doc": doc, "path": "notes.txt" }));
+    assert_eq!(r["name"], "notes.txt (2)");
+    let listed = ok(&mut a, "doc_info", json!({ "doc": doc }))["attachments"].clone();
+    let names: Vec<&str> = listed.as_array().unwrap().iter().map(|x| x["name"].as_str().unwrap()).collect();
+    assert_eq!(names, ["annex.pdf", "notes.txt", "notes.txt (2)"]);
+    assert_eq!(listed[1]["description"], "Meeting notes");
+    assert_eq!(listed[1]["size"], 22);
+    // Saved and reopened, the attachment is there with its bytes.
+    ok(&mut a, "doc_save", json!({ "doc": doc, "path": "with-notes.pdf" }));
+    let saved = std::fs::read(dir.join("with-notes.pdf")).unwrap();
+    let info = pdfcraft_render::inspect(std::sync::Arc::new(saved.clone()), None).unwrap();
+    let att = info.attachments.iter().find(|x| x.name == "notes.txt").expect("notes.txt is in the file");
+    assert_eq!(pdfcraft_render::attachment_data(&saved, None, att).unwrap(), b"keep this with the PDF");
+    // Deleting one leaves the others; a name that is not there is refused; undo brings it back.
+    ok(&mut a, "attachment_delete", json!({ "doc": doc, "name": "notes.txt" }));
+    let names: Vec<String> = ok(&mut a, "doc_info", json!({ "doc": doc }))["attachments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x["name"].as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(names, ["annex.pdf", "notes.txt (2)"]);
+    assert!(a.call("attachment_delete", &json!({ "doc": doc, "name": "notes.txt" })).is_err());
+    ok(&mut a, "edit_undo", json!({ "doc": doc }));
+    assert_eq!(ok(&mut a, "doc_info", json!({ "doc": doc }))["attachments"].as_array().unwrap().len(), 3);
+    assert!(a.call("attachment_add", &json!({ "doc": doc, "path": "missing.txt" })).is_err(), "a file that is not there is refused");
+}
+
+#[test]
 fn fdf_nested_comment_values_survive_export_import_and_save_through_tools() {
     use pdfcraft_cos::{Dict, Document, Object, PdfString, SaveOptions, write_full};
     use std::sync::Arc;
@@ -8893,4 +8987,54 @@ fn bookmark_list_reports_colour_and_style() {
     let mut b = auto(&dir);
     let re = ok(&mut b, "doc_open", json!({ "path": "restyled.pdf" }))["doc"].as_u64().unwrap();
     assert_eq!(style(&ok(&mut b, "bookmark_list", json!({ "doc": re }))["bookmarks"]), style(&set), "saved");
+}
+
+/// `page_render`'s pixels show a rubber stamp written without an appearance as the stamp its
+/// `/Name` names (ISO 32000-2 Table 184), and one with an unknown name as a grey placeholder.
+#[test]
+fn page_render_draws_stamps_without_an_appearance() {
+    let dir = workdir("stamps-without-appearance");
+    let objects: Vec<&[u8]> = vec![
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 300 100] >>",
+        b"<< /Type /Page /Parent 2 0 R /Annots [4 0 R 5 0 R] >>",
+        b"<< /Type /Annot /Subtype /Stamp /Rect [10 20 130 80] /Name /Approved >>",
+        b"<< /Type /Annot /Subtype /Stamp /Rect [170 20 290 80] /Name /MyCustomStamp >>",
+    ];
+    let mut bytes = b"%PDF-1.7\n".to_vec();
+    let mut offsets = Vec::new();
+    for (i, object) in objects.iter().enumerate() {
+        offsets.push(bytes.len());
+        bytes.extend_from_slice(format!("{} 0 obj\n", i + 1).as_bytes());
+        bytes.extend_from_slice(object);
+        bytes.extend_from_slice(b"\nendobj\n");
+    }
+    let xref = bytes.len();
+    bytes.extend_from_slice(format!("xref\n0 {}\n0000000000 65535 f \n", objects.len() + 1).as_bytes());
+    for o in offsets {
+        bytes.extend_from_slice(format!("{o:010} 00000 n \n").as_bytes());
+    }
+    bytes.extend_from_slice(format!("trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n", objects.len() + 1).as_bytes());
+    std::fs::write(dir.join("stamps.pdf"), bytes).unwrap();
+    let mut a = auto(&dir);
+    let doc = ok(&mut a, "doc_open", json!({ "path": "stamps.pdf" }))["doc"].as_u64().unwrap();
+    let (width, _, pixels) = a.render_pixels(doc, 1, 1.0).unwrap();
+    let pixels = pixels.as_ref();
+    // Ink in columns `x0..x1` of rows 20..80, which are the stamps' rows whether counted from the top or the bottom.
+    let ink = |x0: u32, x1: u32| -> Vec<[u8; 3]> {
+        (20..80u32)
+            .flat_map(|y| (x0..x1).map(move |x| (y, x)))
+            .map(|(y, x)| {
+                let i = ((y * width + x) * 4) as usize;
+                [pixels[i], pixels[i + 1], pixels[i + 2]]
+            })
+            .filter(|p| p.iter().any(|v| *v < 200))
+            .collect()
+    };
+    let approved = ink(10, 130);
+    let green = approved.iter().filter(|p| p[1] > p[0] && p[1] > p[2]).count();
+    assert!(green > 300 && green * 10 > approved.len() * 9, "Approved is drawn green: {green} of {}", approved.len());
+    let custom = ink(170, 290);
+    let grey = custom.iter().filter(|p| p[0].abs_diff(p[1]) < 24 && p[1].abs_diff(p[2]) < 24).count();
+    assert!(grey > 100 && grey == custom.len(), "an unknown name is a grey placeholder: {grey} of {}", custom.len());
 }
