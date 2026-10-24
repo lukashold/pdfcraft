@@ -1268,6 +1268,7 @@ theme	Appearance	Giao diện
 	Update	Cập nhật
 	Use 72 DPI (one point per pixel)	Dùng 72 DPI (một điểm cho mỗi điểm ảnh)
 	Use Flate to encode streams that are not encoded	Dùng Flate để mã hóa các luồng chưa được mã hóa
+	In streams that use LZW encoding, use Flate instead	Dùng Flate thay cho LZW trong các luồng mã hóa LZW
 	Use a Digital ID from a file	Dùng Digital ID từ một tệp
 	Use custom DPI	Dùng DPI tùy chỉnh
 	Use each image's embedded DPI; use 72 DPI when it is absent.	Dùng DPI nhúng của từng hình ảnh; dùng 72 DPI khi không có.
@@ -2799,3 +2800,6 @@ key	Space	Space
 	Searchable Image	Ảnh có thể tìm kiếm văn bản
 	Straighten skewed scans	Chỉnh thẳng bản quét bị nghiêng
 	Uncertain orientations are left unchanged. Deskew fits the full image inside the page.	Giữ nguyên hướng khi không xác định chắc chắn. Việc chỉnh nghiêng sẽ đặt toàn bộ ảnh vừa trong trang.
+
+# Date picker: Today button (#4274) (AI-assisted, not separately native-reviewed)
+	Today	Hôm nay

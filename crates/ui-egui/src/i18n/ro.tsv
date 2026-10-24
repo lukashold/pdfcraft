@@ -1228,6 +1228,7 @@
 	Update	Actualizare
 	Use 72 DPI (one point per pixel)	Folosire 72 DPI (un punct pe pixel)
 	Use Flate to encode streams that are not encoded	Folosire Flate pentru codarea fluxurilor necodate
+	In streams that use LZW encoding, use Flate instead	Folosire Flate în locul LZW pentru fluxurile codate LZW
 	Use a Digital ID from a file	Folosire ID digital dintr-un fișier
 	Use custom DPI	Folosire DPI personalizat
 	Use each image's embedded DPI; use 72 DPI when it is absent.	Folosește DPI-ul încorporat al fiecărei imagini; 72 DPI când lipsește.
@@ -2792,3 +2793,6 @@ theme	Appearance	Aspect
 	Searchable Image	Imagine în care se poate căuta
 	Straighten skewed scans	Îndreptare scanări înclinate
 	Uncertain orientations are left unchanged. Deskew fits the full image inside the page.	Orientările incerte rămân neschimbate. Îndreptarea încadrează întreaga imagine în pagină.
+
+# Date picker: Today button (#4274) (AI-assisted, not separately native-reviewed)
+	Today	Astăzi
