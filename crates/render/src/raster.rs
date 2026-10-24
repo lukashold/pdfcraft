@@ -2139,9 +2139,13 @@ mod tests {
             std::thread::sleep(Duration::from_millis(1));
         }
 
+        // Hold A's flag before replacing it: once cancelled, A's worker stops waiting and frees
+        // its slot, which on a slow FreeBSD CI VM happened before the slots were read again.
+        let a_cancelled = lock(&pool.shared.busy).iter().flatten().find(|busy| same_request(busy.request, a)).map(|busy| busy.cancelled.clone());
+        let a_cancelled = a_cancelled.unwrap_or_else(|| panic!("request A is not in flight"));
         let replaced = Instant::now();
         pool.set_queue(vec![b]);
-        assert!(lock(&pool.shared.busy).iter().flatten().any(|busy| busy.cancelled.load(Ordering::Acquire)), "request A was not cancelled");
+        assert!(a_cancelled.load(Ordering::Acquire), "request A was not cancelled");
         let page = receive_before_deadline(&pool);
         assert_eq!(page.request, b);
         assert!(page.error.is_none(), "replacement request failed: {:?}", page.error);
