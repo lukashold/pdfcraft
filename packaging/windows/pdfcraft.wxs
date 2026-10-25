@@ -12,6 +12,9 @@
   PdfCraft arrive on its command line.
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <?ifndef HasCraftFontLicences ?>
+  <?define HasCraftFontLicences=0 ?>
+  <?endif ?>
   <Package
       Name="PdfCraft"
       Manufacturer="Learning Machines LLC"
@@ -125,6 +128,9 @@
     </StandardDirectory>
 
     <Feature Id="Main" Title="PdfCraft" Level="1">
+      <?if $(var.HasCraftFontLicences) = 1 ?>
+      <ComponentGroupRef Id="CraftFontLicences" />
+      <?endif ?>
       <ComponentGroupRef Id="PdfcraftFiles" />
       <ComponentGroupRef Id="PdfcraftModels" />
     </Feature>
@@ -175,6 +181,11 @@
       </Component>
     </ComponentGroup>
 
+    <?if $(var.HasCraftFontLicences) = 1 ?>
+    <ComponentGroup Id="CraftFontLicences" Directory="INSTALLFOLDER">
+      <Files Include="$(var.DocsDir)\**" />
+    </ComponentGroup>
+    <?endif ?>
     <ComponentGroup Id="PdfcraftFiles" Directory="INSTALLFOLDER">
       <Component Id="PdfcraftApp" Guid="E724C1C6-091F-4E21-A685-80D089FDBE21">
         <File Id="PdfcraftExe" Source="$(var.BinDir)\pdfcraft.exe" KeyPath="yes" />

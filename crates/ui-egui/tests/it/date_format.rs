@@ -23,7 +23,7 @@ fn retype(h: &mut Harness<'static, PdfCraftApp>, text: &str) {
     h.get_by_role_and_label(Role::TextInput, "Pattern").scroll_to_me();
     h.run_steps(20);
     let field = h.get_by_role_and_label(Role::TextInput, "Pattern").rect();
-    let card = h.ctx.data(|d| d.get_temp::<egui::Rect>(egui::Id::new("dialog").with("card"))).unwrap();
+    let card = h.ctx.data(|d| d.get_temp::<egui::Rect>(egui::Id::unique("dialog").with("card"))).unwrap();
     assert!(h.ctx.content_rect().contains_rect(field) && card.contains_rect(field), "pattern field {field:?} in dialog {card:?}");
     h.get_by_role_and_label(Role::TextInput, "Pattern").click();
     h.run_steps(1);

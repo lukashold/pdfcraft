@@ -33,7 +33,7 @@ fn the_identity_name_signs_new_comments_and_is_remembered() {
     h.get_by_role_and_label(Role::TextInput, "Name on new comments").scroll_to_me();
     h.run_steps(20);
     let field = h.get_by_role_and_label(Role::TextInput, "Name on new comments").rect();
-    let card = h.ctx.data(|d| d.get_temp::<egui::Rect>(egui::Id::new("dialog").with("card"))).unwrap();
+    let card = h.ctx.data(|d| d.get_temp::<egui::Rect>(egui::Id::unique("dialog").with("card"))).unwrap();
     assert!(h.ctx.content_rect().contains_rect(field) && card.contains_rect(field), "name field {field:?} in dialog {card:?}");
     // Replace the name in the field.
     h.get_by_role_and_label(Role::TextInput, "Name on new comments").click();
