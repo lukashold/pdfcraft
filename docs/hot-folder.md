@@ -154,7 +154,8 @@ original scan or Office/image source. Blank-page archives are kept without this 
 ## Remote credentials and mail handling
 
 The service uses a separate protected `secrets` directory next to its configuration. Windows
-installation restricts this to SYSTEM, Administrators, LocalService and the fixed service SID.
+installation restricts this to SYSTEM, Administrators and the fixed service SID; the shared
+LocalService identity gets no grant.
 A separately configured SCM service account is validated by its actual OS SID, not a task-JSON name. Unix requires the service
 account as owner and permissions 0700 for the directory and 0600 for files. Unsafe permissions,
 symlinks and missing provisioning are rejected instead of falling back to an unprotected file.

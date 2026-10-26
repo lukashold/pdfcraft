@@ -158,7 +158,7 @@
       </Component>
       <Component Id="PdfcraftHotFolderSecrets" Directory="HotFolderSecrets" Guid="4D641968-81D3-474E-867D-C03E18E80584">
         <CreateFolder>
-          <PermissionEx Sddl="D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-19)(A;OICI;FA;;;S-1-5-80-4013549229-3107762393-4025766903-2826249871-1347187068)" />
+          <PermissionEx Sddl="D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-80-4013549229-3107762393-4025766903-2826249871-1347187068)" />
         </CreateFolder>
         <RegistryValue Root="HKLM" Key="Software\PdfCraft\HotFolder" Name="SecretsDirectory"
             Type="string" Value="[HotFolderSecrets]" KeyPath="yes" />
@@ -167,7 +167,7 @@
         <!-- An unelevated user may inspect task state, but only administrators and the
              restricted service account can change the configured work. Keep user tasks on uninstall. -->
         <CreateFolder>
-          <PermissionEx Sddl="D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-19)(A;OICI;FA;;;S-1-5-80-4013549229-3107762393-4025766903-2826249871-1347187068)(A;OICI;GRGX;;;BU)" />
+          <PermissionEx Sddl="D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-80-4013549229-3107762393-4025766903-2826249871-1347187068)(A;OICI;GRGX;;;BU)" />
         </CreateFolder>
         <RegistryValue Root="HKLM" Key="Software\PdfCraft\HotFolder" Name="TaskFile"
             Type="string" Value="[HotFolderData]tasks.json" KeyPath="yes" />

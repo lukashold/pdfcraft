@@ -18,6 +18,15 @@ impl Language {
 }
 
 pub const MESSAGES: &[[&str; 7]] = &[
+    [
+        "This task file belongs to the Hot Folder service. Open the manager with administrative permission to edit it.",
+        "Diese Aufgabendatei gehört dem Hot-Folder-Dienst. Öffnen Sie die Verwaltung mit Administratorrechten, um sie zu bearbeiten.",
+        "Ce fichier de tâches appartient au service Hot Folder. Ouvrez le gestionnaire avec des droits d’administrateur pour le modifier.",
+        "Dit takenbestand is van de Hot Folder-service. Open de beheerder met beheerdersrechten om het te bewerken.",
+        "Este archivo de tareas pertenece al servicio Hot Folder. Abra el administrador con permisos de administrador para editarlo.",
+        "Denne oppgavefilen tilhører Hot Folder-tjenesten. Åpne behandleren med administratortillatelse for å redigere den.",
+        "Den här uppgiftsfilen tillhör Hot Folder-tjänsten. Öppna hanteraren med administratörsbehörighet för att redigera den.",
+    ],
     ["PDF optimization", "PDF-Optimierung", "Optimisation PDF", "PDF-optimalisatie", "Optimización de PDF", "PDF-optimalisering", "PDF-optimering"],
     ["bytes", "Bytes", "octets", "bytes", "bytes", "byte", "byte"],
     ["PDFs reduced", "Verkleinerte PDFs", "PDF réduits", "Verkleinde pdf’s", "PDF reducidos", "Reduserte PDF-er", "Minskade PDF-filer"],

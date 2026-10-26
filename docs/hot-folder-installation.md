@@ -26,9 +26,11 @@ Do not put watched files in the protected program or service-configuration direc
 
 The MSI registers automatic startup and recovery after crashes or controlled service errors,
 with a 60-second restart delay (including subsequent failures). An administrator stop does not
-trigger recovery. Its task directory allows administrators, LocalService and the service SID
-to write; ordinary users may read status. The separate `secrets` directory grants access only
-to administrators, SYSTEM, LocalService and `NT SERVICE\PdfCraftHotFolder`. Credentials
+trigger recovery. Its task directory allows administrators, SYSTEM and the service's own SID
+`NT SERVICE\PdfCraftHotFolder` to write; ordinary users may read status. The shared
+LocalService identity gets no grant, so other LocalService services cannot read or change the
+tasks. The MSI enables that service SID before the first start. The separate `secrets` directory
+grants access only to administrators, SYSTEM and `NT SERVICE\PdfCraftHotFolder`. Credentials
 must never be written into exported task JSON. Installer removal stops and unregisters the
 service and removes its executable, but retains nonempty task and credential directories.
 
@@ -124,7 +126,9 @@ in `/var/lib/pdfcraft-hot-folder/tasks.json`, and enables `pdfcraft-hot-folder.s
 system service manager. The state directory is owned by that account with mode 0700.
 
 Use administrative access to manage the service configuration; preserve its service-account
-ownership and mode 0600. Provision remote-source credentials under the same service account,
+ownership and mode 0600. Opened from the desktop menu as an ordinary user, the manager cannot
+enter that directory: it says the task file belongs to the service and refuses to save, rather
+than showing an empty task list that a save would replace. Provision remote-source credentials under the same service account,
 or use the task manager with administrative permission. Administrative provisioning requires
 an existing private configuration owned by a non-root service account and creates secrets with
 that account's ownership; it does not run the document processor as root.

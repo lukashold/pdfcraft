@@ -323,9 +323,9 @@ $control = Read-Row 'SELECT `Event`, `Wait` FROM `ServiceControl` WHERE `Name` =
 Assert-Equal $control[0] '163' 'Start on install, stop on upgrade/removal, delete on uninstall'
 Assert-Equal $control[1] '1' 'Wait for graceful service stop'
 $acl = Read-Row 'SELECT `SDDLText` FROM `MsiLockPermissionsEx` WHERE `LockObject` = ''HotFolderData''' 1
-Assert-Equal $acl[0] 'D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-19)(A;OICI;FA;;;S-1-5-80-4013549229-3107762393-4025766903-2826249871-1347187068)(A;OICI;GRGX;;;BU)' 'Protected task directory'
+Assert-Equal $acl[0] 'D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-80-4013549229-3107762393-4025766903-2826249871-1347187068)(A;OICI;GRGX;;;BU)' 'Protected task directory'
 $secrets = Read-Row 'SELECT `SDDLText` FROM `MsiLockPermissionsEx` WHERE `LockObject` = ''HotFolderSecrets''' 1
-Assert-Equal $secrets[0] 'D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-19)(A;OICI;FA;;;S-1-5-80-4013549229-3107762393-4025766903-2826249871-1347187068)' 'Credentials must not be readable by ordinary users'
+Assert-Equal $secrets[0] 'D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-80-4013549229-3107762393-4025766903-2826249871-1347187068)' 'Credentials must not be readable by ordinary users'
 $prepare = Read-Row 'SELECT `Type`, `Source`, `Target` FROM `CustomAction` WHERE `Action` = ''PrepareHotFolderService''' 3
 Assert-Equal $prepare[1] 'PdfcraftHotFolderExe' 'Prepare service uses installed executable'
 Assert-Equal $prepare[2] '--service-action prepare-account --config "[HotFolderData]tasks.json"' 'Prepare service has no passwords'

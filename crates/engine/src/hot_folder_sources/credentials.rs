@@ -562,6 +562,9 @@ mod tests {
             format!("O:{named_sid}D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;{service_sid})").parse().unwrap();
         assert!(windows_descriptor_private(&named, false, Some(&named_sid)).is_ok());
         assert!(windows_descriptor_private(&named, false, None).is_err());
+        // The MSI's secrets directory: no shared LocalService grant, only the service's own SID.
+        let installer: LocalBox<SecurityDescriptor> = format!("O:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;{service_sid})").parse().unwrap();
+        assert!(windows_descriptor_private(&installer, true, None).is_ok());
         for sddl in [
             "O:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;LS)(A;OICI;GR;;;BU)",
             "O:BAD:(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;LS)",

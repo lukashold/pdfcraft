@@ -49,7 +49,8 @@ pub struct HotFolderApp {
 
 impl HotFolderApp {
     pub fn new(path: PathBuf) -> Self {
-        let loaded = if path.exists() { hf::load_config(&path) } else { Ok(hf::Config::default()) };
+        let language = Language::system(sys_locale::get_locale().as_deref());
+        let loaded = load_tasks(&path, path.try_exists(), language);
         let error = loaded.as_ref().err().cloned();
         let saved_snapshot = loaded.as_ref().ok().and_then(|c| serde_json::to_vec(c).ok()).unwrap_or_default();
         let disk_snapshot = read_disk(&path).ok().flatten();
@@ -62,7 +63,7 @@ impl HotFolderApp {
             config: loaded.unwrap_or_default(),
             selected: usize::MAX,
             start_text: String::new(),
-            language: Language::system(sys_locale::get_locale().as_deref()),
+            language,
             load_error: error.clone(),
             error: initial_error,
             worker_error: None,
@@ -940,6 +941,21 @@ fn calendar(ui: &mut egui::Ui, schedule: &mut hf::Schedule, language: Language) 
     }
 }
 
+/// The task file the manager edits. One this user cannot even look up is an error that blocks
+/// saving, never an empty configuration: the Linux service keeps its tasks in a directory only
+/// its own account may enter, and a desktop user would otherwise see no tasks and overwrite them.
+fn load_tasks(path: &std::path::Path, exists: std::io::Result<bool>, language: Language) -> Result<hf::Config, String> {
+    match exists {
+        Ok(true) => hf::load_config(path),
+        Ok(false) => Ok(hf::Config::default()),
+        Err(e) => Err(format!(
+            "{} ({}: {e})",
+            language.t("This task file belongs to the Hot Folder service. Open the manager with administrative permission to edit it."),
+            path.display()
+        )),
+    }
+}
+
 fn read_disk(path: &std::path::Path) -> Result<Option<Vec<u8>>, String> {
     use std::io::Read;
     match std::fs::File::open(path) {
@@ -997,6 +1013,37 @@ impl eframe::App for HotFolderApp {
 mod tests {
     use super::*;
     use egui_kittest::{Harness, kittest::Queryable};
+
+    /// A task file the user may not look up (the Linux service's private state directory) is
+    /// refused with the reason, never shown as an empty configuration that a save would replace.
+    #[test]
+    fn an_unreachable_task_file_is_refused_not_replaced_by_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tasks.json");
+        let denied = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        let error = load_tasks(&path, Err(denied), Language(1)).unwrap_err();
+        assert!(error.starts_with("Diese Aufgabendatei gehört dem Hot-Folder-Dienst."), "{error}");
+        assert!(error.contains("tasks.json"), "{error}");
+        assert!(load_tasks(&path, Ok(false), Language(0)).unwrap().tasks.is_empty(), "a missing file starts empty");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let private = dir.path().join("service");
+            std::fs::create_dir(&private).unwrap();
+            let tasks = private.join("tasks.json");
+            std::fs::write(&tasks, br#"{"tasks":[]}"#).unwrap();
+            std::fs::set_permissions(&private, std::fs::Permissions::from_mode(0o000)).unwrap();
+            // root may enter any directory, and then the file is simply readable.
+            if tasks.try_exists().is_err() {
+                let mut app = HotFolderApp::new(tasks.clone());
+                app.inline = true;
+                assert!(app.load_error.is_some(), "the unreadable service file is reported");
+                assert!(app.save().is_err(), "and never overwritten");
+            }
+            std::fs::set_permissions(&private, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+    }
 
     #[test]
     fn hot_folder_small_window_keeps_actions_tasks_service_and_errors_reachable_in_every_language() {
