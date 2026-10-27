@@ -8,8 +8,8 @@ foreach ($name in 'pdfcraft.exe', 'pdfcraft-cli.exe', 'pdfcraft-hot-folder.exe')
 }
 foreach ($name in 'LICENSE-MIT', 'LICENSE-APACHE', 'NOTICE') { Copy-Item -LiteralPath $name -Destination $stage }
 Copy-Item -LiteralPath 'assets/app-icon/LICENSE-document.txt' -Destination $stage
-Set-Content -LiteralPath "$stage/models/detection.rten" -Value 'synthetic installer fixture; never an OCR model'
-Set-Content -LiteralPath "$stage/models/recognition.rten" -Value 'synthetic installer fixture; never an OCR model'
+Set-Content -LiteralPath "$stage/models/text-detection.onnx" -Value 'synthetic installer fixture; never an OCR model'
+Set-Content -LiteralPath "$stage/models/text-recognition.onnx" -Value 'synthetic installer fixture; never an OCR model'
 $msi = Join-Path $stage 'service-test.msi'
 $upgrade = Join-Path $stage 'service-test-upgrade.msi'
 $installedMsi = $msi

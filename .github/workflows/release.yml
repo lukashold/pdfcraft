@@ -279,9 +279,9 @@ jobs:
           dpkg-deb --contents "$main_deb" | grep -E 'usr/bin/pdfcraft$|metainfo|applications'
           dpkg-deb --contents "$hot_deb" | grep -E 'usr/bin/pdfcraft-hot-folder$'
           # The OCR models (#103), where the installed app looks: <bin>/../share/pdfcraft/models.
-          dpkg-deb --contents "$main_deb" | grep -E 'usr/share/pdfcraft/models/.+\.rten$'
+          dpkg-deb --contents "$main_deb" | grep -E 'usr/share/pdfcraft/models/text-detection\.onnx$'
           # Named exactly: dist/release also holds the CLI-only tar.gz, and `tar -tzf a b` reads b as a member.
-          tar -tzf "dist/release/pdfcraft-$PDFCRAFT_VERSION-linux-${{ matrix.arch }}.tar.gz" | grep -E '/share/pdfcraft/models/.+\.rten$'
+          tar -tzf "dist/release/pdfcraft-$PDFCRAFT_VERSION-linux-${{ matrix.arch }}.tar.gz" | grep -E '/share/pdfcraft/models/text-detection\.onnx$'
           ldd target/release/pdfcraft
           # The CLI-only archive: the binary and its licences, and it runs.
           cli="dist/release/pdfcraft-cli-$PDFCRAFT_VERSION-linux-${{ matrix.arch }}.tar.gz"
@@ -377,7 +377,7 @@ jobs:
         run: |
           tar -tzf "dist/release/pdfcraft-$PDFCRAFT_VERSION-linux-riscv64.tar.gz" | grep -E '/bin/pdfcraft$'
           # The OCR models (#103), where the installed app looks: <bin>/../share/pdfcraft/models.
-          tar -tzf "dist/release/pdfcraft-$PDFCRAFT_VERSION-linux-riscv64.tar.gz" | grep -E '/share/pdfcraft/models/.+\.rten$'
+          tar -tzf "dist/release/pdfcraft-$PDFCRAFT_VERSION-linux-riscv64.tar.gz" | grep -E '/share/pdfcraft/models/text-detection\.onnx$'
           cli="dist/release/pdfcraft-cli-$PDFCRAFT_VERSION-linux-riscv64.tar.gz"
           tar -tzf "$cli" | grep -E '/pdfcraft-cli$'
           tar -tzf "$cli" | grep -E '/LICENSE-APACHE$'
