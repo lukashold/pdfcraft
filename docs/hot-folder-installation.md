@@ -65,7 +65,7 @@ making the private configuration or secret store readable by other users. The fo
 explicit elevated command reapplies service-SID/recovery settings to a matching installation:
 
 ```powershell
-& 'C:\Program Files\PdfCraft\pdfcraft-hot-folder.exe' --service-action prepare-account `
+& 'C:\Program Files\ArtCraft\PdfCraft\pdfcraft-hot-folder.exe' --service-action prepare-account `
   --config 'C:\ProgramData\PdfCraft\HotFolder\tasks.json'
 ```
 

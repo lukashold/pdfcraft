@@ -103,7 +103,9 @@ try {
     throw "Upgrade did not preserve the optional automatic service and its account: state=$($service.State), startup=$($service.StartMode), account=$($service.StartName)"
   }
   if (-not (Test-Path -LiteralPath "$data/keep-user-tasks.txt")) { throw 'Upgrade deleted task data' }
-  if ((Get-FileHash -LiteralPath "$env:ProgramFiles/PdfCraft/pdfcraft-hot-folder.exe" -Algorithm SHA256).Hash -ne $upgradeHash) {
+  # The installer records its folder (Program Files\ArtCraft\PdfCraft for everyone).
+  $installDir = (Get-ItemProperty -LiteralPath 'HKLM:\Software\PdfCraft' -Name InstallDir).InstallDir
+  if ((Get-FileHash -LiteralPath (Join-Path $installDir 'pdfcraft-hot-folder.exe') -Algorithm SHA256).Hash -ne $upgradeHash) {
     throw 'Upgrade retained the old executable instead of the new payload'
   }
   Invoke-Msi "/i `"$installedMsi`" REMOVE=HotFolder" 'remove-companion'
