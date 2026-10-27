@@ -13,9 +13,12 @@ configure storage that is available to the service account for unattended proces
 
 ## Windows
 
-Select **Also install PdfCraft Hot Folder** in the MSI. It is unchecked on a new installation.
-An upgrade preserves an installed companion unless you deselect it. For unattended installation,
-pass `INSTALLHOTFOLDER=1`; pass `INSTALLHOTFOLDER=0` to decline it on a new installation.
+Choose **Everyone on this computer** in the MSI, then select **Also install PdfCraft Hot
+Folder**. It is unchecked on a new installation. The Hot Folder registers a Windows service, so
+it is offered only for an installation for everyone; **Only for me** leaves it out. An upgrade
+preserves an installed companion unless you deselect it. For unattended installation, pass
+`ALLUSERS=1 INSTALLHOTFOLDER=1`; without `ALLUSERS=1` the MSI installs for one account and skips
+the companion. Pass `INSTALLHOTFOLDER=0` to decline it on a new installation.
 The maintenance screen can add or remove the companion without removing PdfCraft.
 
 The **PdfCraft Hot Folder** Start menu entry opens the task file used by the service:

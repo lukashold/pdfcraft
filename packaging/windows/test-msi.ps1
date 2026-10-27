@@ -38,41 +38,11 @@ function Assert-NoRow([string] $Sql, [string] $What) {
   } finally { [void] $view.Close() }
 }
 
-# Test the compiled condition with Windows Installer's evaluator, in a restricted session that
-# cannot change machine state. Normal installs/repairs work, per-user overrides fail, and removal
-# of an older incorrectly scoped installation remains possible (#305).
-$scopeMessage = 'PdfCraft must be installed for all users. Run setup with administrator privileges and ALLUSERS=1; per-user installation is not supported.'
-$scopeCondition = Read-Row ('SELECT `Condition` FROM `LaunchCondition` WHERE `Description` = ''' + $scopeMessage + '''') 1
+# The shared compiled contract covers both scopes, duplicate guards and safe maintenance.
+# Keep it in a separate process because Windows Installer permits one session per process.
+& (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'check-install-policy.ps1') -MsiPath $Path
+if ($LASTEXITCODE -ne 0) { throw 'Dual-scope installer contract failed.' }
 $Installer.UILevel = 2
-$session = $null
-try {
-  $session = $Installer.OpenPackage((Resolve-Path -LiteralPath $Path).Path, 1)
-  foreach ($case in @(
-      @('machine install', '1', '', '', '', 1),
-      @('machine repair', '1', '', '1', '', 1),
-      @('forced per-user install', '2', '1', '', '', 0),
-      @('empty ALLUSERS', '', '', '', '', 0),
-      @('resolved per-user install', '', '1', '', '', 0),
-      @('forced per-user repair', '2', '1', '1', '', 0),
-      @('machine uninstall', '1', '', '1', 'ALL', 1),
-      @('legacy per-user uninstall', '', '1', '1', 'ALL', 1))) {
-    $session.Property('ALLUSERS') = $case[1]
-    $session.Property('MSIINSTALLPERUSER') = $case[2]
-    $session.Property('Installed') = $case[3]
-    $session.Property('REMOVE') = $case[4]
-    Assert-Equal ($session.EvaluateCondition($scopeCondition[0])) $case[5] $case[0]
-  }
-} finally {
-  if ($session) { [void] [Runtime.InteropServices.Marshal]::FinalReleaseComObject($session) }
-}
-foreach ($sequence in @('InstallUISequence', 'InstallExecuteSequence')) {
-  $launch = Read-Row ('SELECT `Condition`, `Sequence` FROM `' + $sequence + '` WHERE `Action` = ''LaunchConditions''') 2
-  Assert-Equal $launch[0] '' "$sequence launch conditions are unconditional"
-  $cost = Read-Row ('SELECT `Sequence` FROM `' + $sequence + '` WHERE `Action` = ''CostInitialize''') 1
-  if ([int] $launch[1] -le 0 -or [int] $launch[1] -ge [int] $cost[0]) {
-    throw "$sequence must reject per-user overrides before costing"
-  }
-}
 $manufacturer = Read-Row 'SELECT `Value` FROM `Property` WHERE `Property` = ''Manufacturer''' 1
 Assert-Equal $manufacturer[0] 'Learning Machines LLC' 'MSI manufacturer'
 
@@ -173,7 +143,7 @@ Assert-Equal $checked[0] '1' 'Welcome checkbox value'
 $app = Read-Row 'SELECT `KeyPath` FROM `Component` WHERE `Component` = ''PdfcraftApp''' 1
 Assert-Equal $app[0] 'PdfcraftExe' 'Shortcut executable key path'
 $scope = Read-Row 'SELECT `Value` FROM `Property` WHERE `Property` = ''ALLUSERS''' 1
-Assert-Equal $scope[0] '1' 'Per-machine shortcut scope'
+Assert-Equal $scope[0] '2' 'Dual-scope shortcut package'
 
 # Each File Explorer menu remembers whether it was installed by finding its key path in HKLM, in the
 # package's own registry view (64-bit for x64 and arm64). Only a release that offered the menu can
@@ -181,12 +151,22 @@ Assert-Equal $scope[0] '1' 'Per-machine shortcut scope'
 $upgradeCode = Read-Row 'SELECT `Value` FROM `Property` WHERE `Property` = ''UpgradeCode''' 1
 $view64 = $Database.SummaryInformation(0).Property(7) -notmatch '^Intel;'
 function Assert-MenuSearch([string] $Found, [string] $Key, [string] $Release, [string] $Since, [string] $What) {
-  $search = Read-Row ('SELECT `Root`, `Key`, `Name`, `Type` FROM `RegLocator`, `AppSearch` WHERE `AppSearch`.`Signature_` = `RegLocator`.`Signature_` AND `AppSearch`.`Property` = ''' + $Found + '''') 4
-  Assert-Equal $search[0] '2' "$What search HKLM root"
-  Assert-Equal $search[1] $Key "$What search key"
-  Assert-Equal $search[2] '' "$What search reads the default value"
-  # msidbLocatorTypeRawValue (2), plus msidbLocatorType64bit (16) in a 64-bit package.
-  Assert-Equal ([int] $search[3]) $(if ($view64) { 18 } else { 2 }) "$What search type"
+  foreach ($context in @(@('M', '2'), @('U', '1'))) {
+    $cache = ''
+    $loaders = $Database.OpenView('SELECT `Action`, `Target` FROM `CustomAction` WHERE `Source` = ''' + $Found + '''')
+    try {
+      [void]$loaders.Execute()
+      while ($row = $loaders.Fetch()) {
+        if ($row.StringData(1) -match ('^CraftLoadOption[0-9]+' + $context[0] + '$')) { $cache = $row.StringData(2).Trim('[]') }
+      }
+    } finally { [void]$loaders.Close() }
+    if (-not $cache) { throw "$What has no context-specific loader." }
+    $search = Read-Row ('SELECT `Root`, `Key`, `Name`, `Type` FROM `RegLocator`, `AppSearch` WHERE `AppSearch`.`Signature_` = `RegLocator`.`Signature_` AND `AppSearch`.`Property` = ''' + $cache + '''') 4
+    Assert-Equal $search[0] $context[1] "$What context $($context[0]) search root"
+    Assert-Equal $search[1] $Key "$What search key"
+    Assert-Equal $search[2] '' "$What search reads the default value"
+    Assert-Equal ([int] $search[3]) $(if ($view64) { 18 } else { 2 }) "$What search type"
+  }
   $upgrade = Read-Row ('SELECT `UpgradeCode`, `VersionMin`, `VersionMax`, `Attributes` FROM `Upgrade` WHERE `ActionProperty` = ''' + $Release + '''') 4
   Assert-Equal $upgrade[0] $upgradeCode[0] "$What release detection upgrade code"
   Assert-Equal $upgrade[1] $Since "$What release detection minimum"
@@ -212,15 +192,16 @@ if ([int] $removeRegistry[0] -ge [int] $writeRegistry[0]) { throw 'Legacy menu c
 $imageKey = 'Software\Classes\SystemFileAssociations\.png\shell\PdfCraft.CreatePdf'
 foreach ($ext in @('png', 'jpg', 'jpeg', 'tif', 'tiff', 'gif', 'bmp', 'jp2', 'j2k', 'jpx')) {
   $key = 'Software\Classes\SystemFileAssociations\.' + $ext + '\shell\PdfCraft.CreatePdf'
-  # Cleanup belongs to the always-installed app, so opting out also removes pre-0.8 rows.
+  # Cleanup belongs to the always-installed app, so opting out also removes pre-0.8 rows. It follows
+  # the chosen context: an installation for one account must not need HKLM access.
   $cleanup = Read-Row ('SELECT `Root`, `Name`, `Component_` FROM `RemoveRegistry` WHERE `Key` = ''' + $key + '''') 3
-  Assert-Equal $cleanup[0] '2' "$ext legacy menu cleanup HKLM root"
+  Assert-Equal $cleanup[0] '-1' "$ext legacy menu cleanup context-sensitive root"
   Assert-Equal $cleanup[1] '-' "$ext legacy menu cleanup includes subkeys"
   Assert-Equal $cleanup[2] 'PdfcraftApp' "$ext legacy menu cleanup component"
   $menu = Read-Row ('SELECT `Value`, `Component_`, `Root` FROM `Registry` WHERE `Key` = ''' + $key + ''' AND `Name` IS NULL') 3
   Assert-Equal $menu[0] 'Create PDF with PdfCraft…' "$ext context menu label"
   Assert-Equal $menu[1] 'PdfcraftImageContextMenu' "$ext context menu component"
-  Assert-Equal $menu[2] '2' "$ext context menu HKLM root"
+  Assert-Equal $menu[2] '-1' "$ext context menu context-sensitive root"
   $command = Read-Row ('SELECT `Value`, `Component_` FROM `Registry` WHERE `Key` = ''' + $key + '\command''') 2
   Assert-Equal $command[0] '"[#PdfcraftExe]" --create-images "%1"' "$ext context menu command"
   Assert-Equal $command[1] 'PdfcraftImageContextMenu' "$ext context menu command component"
@@ -253,7 +234,7 @@ $pdfKey = 'Software\Classes\SystemFileAssociations\.pdf\shell\PdfCraft.Edit'
 $pdfMenu = Read-Row ('SELECT `Registry`, `Value`, `Component_`, `Root` FROM `Registry` WHERE `Key` = ''' + $pdfKey + ''' AND `Name` IS NULL') 4
 Assert-Equal $pdfMenu[1] 'Edit with PdfCraft' 'PDF context menu label'
 Assert-Equal $pdfMenu[2] 'PdfcraftPdfContextMenu' 'PDF context menu component'
-Assert-Equal $pdfMenu[3] '2' 'PDF context menu HKLM root'
+Assert-Equal $pdfMenu[3] '-1' 'PDF context menu context-sensitive root'
 foreach ($value in @(@('Icon', '"[#PdfcraftExe]",0'), @('MultiSelectModel', 'Document'))) {
   $row = Read-Row ('SELECT `Value`, `Component_` FROM `Registry` WHERE `Key` = ''' + $pdfKey + ''' AND `Name` = ''' + $value[0] + '''') 2
   Assert-Equal $row[0] $value[1] "PDF context menu $($value[0])"
@@ -311,6 +292,11 @@ Assert-Equal $rm[0] 'MsiRMFilesInUse' 'Files-in-use dialog'
 # under LocalService, never an interactive user's credentials or LocalSystem.
 $feature = Read-Row 'SELECT `Level` FROM `Feature` WHERE `Feature` = ''HotFolder''' 1
 Assert-Equal $feature[0] '2' 'Hot Folder default feature level'
+# A Windows service cannot belong to one account's installation: only ALLUSERS=1 may enable it.
+$enabled = Read-Row 'SELECT `Condition` FROM `Condition` WHERE `Feature_` = ''HotFolder'' AND `Level` = 1' 1
+Assert-Equal $enabled[0] 'INSTALLHOTFOLDER = 1 AND ALLUSERS = 1' 'Hot Folder needs an installation for everyone'
+$disabled = Read-Row 'SELECT `Condition` FROM `Condition` WHERE `Feature_` = ''HotFolder'' AND `Level` = 0' 1
+Assert-Equal $disabled[0] 'ALLUSERS <> 1' 'Hot Folder is disabled for one account'
 Assert-NoRow 'SELECT `Value` FROM `Property` WHERE `Property` = ''INSTALLHOTFOLDER''' 'Hot Folder enabled by default'
 if (($secure[0] -split ';') -notcontains 'INSTALLHOTFOLDER') { throw 'Hot Folder choice is not secure' }
 $choice = Read-Row 'SELECT `Type`, `Property` FROM `Control` WHERE `Dialog_` = ''InstallWelcome'' AND `Control` = ''HotFolder''' 2
@@ -353,4 +339,4 @@ foreach ($action in @(@('AddHotFolder', 'AddLocal'), @('RemoveHotFolder', 'Remov
 }
 [void] [Runtime.InteropServices.Marshal]::FinalReleaseComObject($Database)
 [void] [Runtime.InteropServices.Marshal]::FinalReleaseComObject($Installer)
-Write-Output 'ok MSI: per-machine scope guard, publisher, persistent progress text, Start Menu shortcut, optional desktop shortcut and PDF and image context menus (on for a first install, kept on update only while present; checkboxes for the first two), icon/key path, full-UI success/cancel/error and Finish controls, files-in-use dialog, OCR models'
+Write-Output 'ok MSI: dual-scope guards, publisher, persistent progress text, Start Menu shortcut, optional desktop shortcut and PDF and image context menus (on for a first install, kept on update only while present; checkboxes for the first two), icon/key path, full-UI success/cancel/error and Finish controls, files-in-use dialog, OCR models'

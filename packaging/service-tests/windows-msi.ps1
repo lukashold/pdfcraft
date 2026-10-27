@@ -28,7 +28,8 @@ $upgradeHash = (Get-FileHash -LiteralPath "$stage/pdfcraft-hot-folder.exe" -Algo
 if ($LASTEXITCODE -ne 0) { throw 'Upgrade MSI compilation failed' }
 function Invoke-Msi([string] $Options, [string] $Name) {
   $log = Join-Path $stage "$Name.log"
-  $process = Start-Process -FilePath msiexec.exe -ArgumentList "$Options /qn /norestart /l*v `"$log`"" -Wait -PassThru -WindowStyle Hidden
+  # The service belongs to an installation for everyone; silent installs default to one account.
+  $process = Start-Process -FilePath msiexec.exe -ArgumentList "$Options ALLUSERS=1 /qn /norestart /l*v `"$log`"" -Wait -PassThru -WindowStyle Hidden
   if ($process.ExitCode -notin @(0,3010)) {
     Select-String -LiteralPath $log -Pattern 'Return value 3|Error [0-9]|failed' -Context 12,4
     throw "MSI $Name failed: $($process.ExitCode)"
