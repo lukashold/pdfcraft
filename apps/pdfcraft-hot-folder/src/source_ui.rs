@@ -137,11 +137,12 @@ impl SourceUi {
         };
         let old = kind;
         let names = ["Local or network folder", "FTP / FTPS", "Outlook attachments", "PDFCraft project"];
-        let picker = egui::ComboBox::from_id_salt("source-kind").selected_text(t(names.get(kind).copied().unwrap_or(names[0]))).show_ui(ui, |ui| {
-            for (index, name) in names.iter().enumerate() {
-                ui.selectable_value(&mut kind, index, t(name));
-            }
-        });
+        let picker =
+            craft_ui::ComboBox::from_id_salt("source-kind").selected_text(t(names.get(kind).copied().unwrap_or(names[0]))).show_ui(ui, |ui| {
+                for (index, name) in names.iter().enumerate() {
+                    ui.selectable_value(&mut kind, index, t(name));
+                }
+            });
         picker.response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, true, t("Source")));
         if kind != old {
             task.source = match kind {

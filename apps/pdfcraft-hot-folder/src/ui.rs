@@ -282,7 +282,7 @@ impl HotFolderApp {
             ui.horizontal(|ui| {
                 ui.heading("PdfCraft Hot Folder");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let picker = egui::ComboBox::from_id_salt("ui-language")
+                    let picker = craft_ui::ComboBox::from_id_salt("ui-language")
                         .selected_text(LANGUAGES.get(self.language.0).map_or("English", |l| l.1))
                         .show_ui(ui, |ui| {
                             for (index, (_, name)) in LANGUAGES.iter().enumerate() {
@@ -508,7 +508,7 @@ impl HotFolderApp {
                             ui.horizontal(|ui| {
                                 let caption = ui.label(t("Document language"));
                                 let name = ocr::LANGUAGES.iter().find(|l| l.0 == task.settings.language).map_or("English", |l| l.1);
-                                egui::ComboBox::from_id_salt("ocr-language")
+                                craft_ui::ComboBox::from_id_salt("ocr-language")
                                     .height(480.0)
                                     .selected_text(name)
                                     .show_ui(ui, |ui| {
@@ -747,7 +747,7 @@ fn output_steps(ui: &mut egui::Ui, plan: &mut output::OutputPlan, language: Lang
                     let caption = ui.label(format!("{} {}", t("Save"), index.saturating_add(1)));
                     ui.add_enabled_ui(!analysis, |ui| {
                         let shown = if analysis { output::Format::Analysis } else { step.format };
-                        let picker = egui::ComboBox::from_id_salt("format").selected_text(t(shown.label())).show_ui(ui, |ui| {
+                        let picker = craft_ui::ComboBox::from_id_salt("format").selected_text(t(shown.label())).show_ui(ui, |ui| {
                             for format in output::Format::ALL {
                                 if ui.selectable_value(&mut step.format, *format, t(format.label())).changed()
                                     && !matches!(step.format, output::Format::Pdf | output::Format::ImagePdf)
@@ -762,7 +762,7 @@ fn output_steps(ui: &mut egui::Ui, plan: &mut output::OutputPlan, language: Lang
                         remove = Some(index);
                     }
                 });
-                let group = egui::ComboBox::from_id_salt("group").selected_text(t(grouping_label(step.grouping))).show_ui(ui, |ui| {
+                let group = craft_ui::ComboBox::from_id_salt("group").selected_text(t(grouping_label(step.grouping))).show_ui(ui, |ui| {
                     for grouping in [output::Grouping::File, output::Grouping::Folder, output::Grouping::All] {
                         ui.selectable_value(&mut step.grouping, grouping, t(grouping_label(grouping)));
                     }
@@ -817,7 +817,7 @@ fn pdf_optimization(ui: &mut egui::Ui, settings: &mut output::optimization::Sett
         Mode::Custom => t("Custom PDF optimization"),
     };
     let caption = ui.label(t("PDF optimization"));
-    egui::ComboBox::from_id_salt("pdf-optimization")
+    craft_ui::ComboBox::from_id_salt("pdf-optimization")
         .selected_text(label(settings.mode))
         .show_ui(ui, |ui| {
             for mode in [Mode::Off, Mode::Lossless, Mode::Reduce, Mode::Custom] {
@@ -863,7 +863,7 @@ fn optimization_images(ui: &mut egui::Ui, settings: &mut output::optimization::I
             Compression::Zip => t("ZIP (lossless encoding)"),
             Compression::Jpeg => "JPEG",
         };
-        let picker = egui::ComboBox::from_id_salt("compression").selected_text(label(settings.compression)).show_ui(ui, |ui| {
+        let picker = craft_ui::ComboBox::from_id_salt("compression").selected_text(label(settings.compression)).show_ui(ui, |ui| {
             for compression in [Compression::Retain, Compression::Zip, Compression::Jpeg] {
                 ui.selectable_value(&mut settings.compression, compression, label(compression));
             }
@@ -896,11 +896,12 @@ fn calendar(ui: &mut egui::Ui, schedule: &mut hf::Schedule, language: Language) 
     };
     let old = kind;
     let names = ["At regular intervals", "Daily", "Weekly", "Monthly"];
-    let recurrence = egui::ComboBox::from_id_salt("recurrence").selected_text(t(names.get(kind).copied().unwrap_or(names[0]))).show_ui(ui, |ui| {
-        for (index, name) in names.iter().enumerate() {
-            ui.selectable_value(&mut kind, index, t(name));
-        }
-    });
+    let recurrence =
+        craft_ui::ComboBox::from_id_salt("recurrence").selected_text(t(names.get(kind).copied().unwrap_or(names[0]))).show_ui(ui, |ui| {
+            for (index, name) in names.iter().enumerate() {
+                ui.selectable_value(&mut kind, index, t(name));
+            }
+        });
     recurrence.response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, true, t("Schedule")));
     if old != kind {
         *schedule = match kind {
@@ -912,14 +913,13 @@ fn calendar(ui: &mut egui::Ui, schedule: &mut hf::Schedule, language: Language) 
     }
     if let hf::Schedule::Weekly { weekday, .. } = schedule {
         let weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-        let day = egui::ComboBox::from_id_salt("weekday").selected_text(t(weekdays.get(*weekday as usize).copied().unwrap_or(weekdays[0]))).show_ui(
-            ui,
-            |ui| {
+        let day = craft_ui::ComboBox::from_id_salt("weekday")
+            .selected_text(t(weekdays.get(*weekday as usize).copied().unwrap_or(weekdays[0])))
+            .show_ui(ui, |ui| {
                 for (index, name) in weekdays.iter().enumerate() {
                     ui.selectable_value(weekday, index as u32, t(name));
                 }
-            },
-        );
+            });
         day.response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, true, t("Weekly")));
     }
     if let hf::Schedule::Monthly { day, .. } = schedule {
