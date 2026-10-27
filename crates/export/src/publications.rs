@@ -2,7 +2,8 @@
 //! https://learn.microsoft.com/office/open-xml/spreadsheet/structure-of-a-spreadsheetml-document
 //! https://www.w3.org/TR/epub-33/
 
-use super::{Item, Page, Zip, esc, hex, items};
+use super::layout::{Item, items};
+use super::{Page, Zip, esc, hex};
 
 const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const PKG_REL: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
