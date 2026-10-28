@@ -928,6 +928,45 @@ fn step(task: &Task, state: &mut State, current: u64, config_path: &Path, root: 
     step_with_model_check(task, state, current, config_path, root, should_stop, &|| ocr::engine().map(|_| ()))
 }
 
+/// What every phase of one step shares: the task, its confined folders and how to stop.
+struct StepContext<'a> {
+    task: &'a Task,
+    config_path: &'a Path,
+    root: Option<&'a Path>,
+    input: PathBuf,
+    output: PathBuf,
+    store: sources::CredentialStore,
+    /// True once the service stops or this task's configuration changes.
+    stopped: &'a dyn Fn() -> bool,
+}
+
+/// Remote files staged into the inbox, the staged item behind each candidate path, and the
+/// saved-output receipts that must still verify before any acknowledgement.
+#[derive(Default)]
+struct StagedQueue {
+    candidates: Vec<PathBuf>,
+    remote: BTreeMap<PathBuf, sources::StagedSource>,
+    proofs: Vec<Receipt>,
+}
+
+/// An input selected this step: its path, observation key and fingerprint.
+type ReadyInput = (PathBuf, String, String);
+
+/// Inputs selected this step, and how many are still waiting, the selected ones included.
+#[derive(Default)]
+struct Selection {
+    ready: Vec<ReadyInput>,
+    waiting: usize,
+    visited: usize,
+}
+
+/// Running byte totals of one step's inputs as read and as prepared.
+#[derive(Default)]
+struct Budget {
+    read: u64,
+    prepared: u64,
+}
+
 fn step_with_model_check(
     task: &Task,
     state: &mut State,
@@ -945,119 +984,109 @@ fn step_with_model_check(
         sources::SourceConfig::Ftp(_) | sources::SourceConfig::Outlook(_) => sources::CredentialStore::for_config(config_path, root)?,
         _ => sources::CredentialStore::OsVault,
     };
-    let mut remote = BTreeMap::new();
-    let mut acknowledgement_proofs = Vec::new();
-    let candidates = if matches!(task.source, sources::SourceConfig::Local) {
-        Vec::new()
-    } else {
-        let staged = sources::stage(&task.source, &input, root, &task_stopped, &store)?;
-        if staged.has_more && task.output_plan.needs_batch() {
-            return Err("combined remote queue exceeds 128 files or 512 MiB; choose a smaller source or per-file outputs".into());
-        }
-        for warning in staged.warnings {
-            state.log.push(LogEntry { at: now(), task: task.id.clone(), input: None, output: None, error: Some(warning) });
-        }
-        for item in &staged.pending_acknowledgements {
-            let path = confined(&input.join(&item.staged_relative), root)?;
-            let key = format!("{}:{}:{}", task.id, path.display(), item.sha256);
-            let receipt =
-                journal::receipt(config_path, state, &key)?.ok_or("pending source acknowledgement has no saved-output receipt; original retained")?;
-            verify_outputs(&receipt, root)?;
-        }
-        let mut items = staged.items;
-        items.extend(staged.pending_acknowledgements);
-        // A final Outlook acknowledgement may consume the whole message. Verify every
-        // earlier ready attachment's outputs before acknowledging any of its peers.
-        for item in &items {
-            let path = confined(&input.join(&item.staged_relative), root)?;
-            let key = format!("{}:{}:{}", task.id, path.display(), item.sha256);
-            if let Some(receipt) = journal::receipt(config_path, state, &key)? {
-                verify_outputs(&receipt, root)?;
-                acknowledgement_proofs.push(receipt.clone());
-            }
-        }
-        if !matches!(task.source, sources::SourceConfig::Project(_)) {
-            items.sort_by(|a, b| a.relative.cmp(&b.relative));
-        }
-        let mut paths = Vec::new();
-        for item in items {
-            let path = confined(&input.join(&item.staged_relative), root)?;
-            if !path.starts_with(&input) {
-                return Err("staged source escaped its inbox".into());
-            }
-            let key = format!("{}:{}", task.id, path.display());
-            // Recover a failed/interrupted acknowledgement without rerunning OCR or saving duplicates.
-            if journal::receipt(config_path, state, &format!("{key}:{}", item.sha256))?.is_some() {
-                for receipt in &acknowledgement_proofs {
-                    verify_outputs(receipt, root)?;
-                }
-                sources::acknowledge(&task.source, &input, &item, &item.sha256, root, &task_stopped, &store)?;
-                remove_staged(&path, &item.sha256)?;
-                continue;
-            }
-            let ext = item.relative.extension().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
-            if task.pdf && ext == "pdf" || task.images && matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "tif" | "tiff" | "bmp") {
-                remote.insert(path.clone(), item);
-                paths.push(path);
-            }
-        }
-        paths
+    let cx = StepContext { task, config_path, root, input, output, store, stopped: &task_stopped };
+    let queue = if matches!(task.source, sources::SourceConfig::Local) { StagedQueue::default() } else { stage_remote(&cx, state)? };
+    let Some(ready) = select_ready(&cx, state, current, should_stop, queue.candidates)? else {
+        return Ok(());
     };
-    let mut ready = Vec::new();
-    let mut waiting = 0usize;
-    let batch = task.output_plan.needs_batch();
-    let mut visited = 0_usize;
-    let mut consider = |path: PathBuf| -> Result<(), String> {
-        let key = format!("{}:{}", task.id, path.display());
-        let stamp = fingerprint(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-        let previous = journal::observation(config_path, state, &key)?;
-        let changed = previous.as_ref().is_none_or(|observation| observation.fingerprint != stamp);
-        let observation = if changed {
-            Observation { fingerprint: stamp.clone(), since: current, attempted: false, receipt_key: None }
-        } else {
-            previous.ok_or("source observation unavailable")?
-        };
-        let pending_cleanup = if let Some(receipt_key) = &observation.receipt_key {
-            journal::receipt(config_path, state, receipt_key)?.is_some_and(|r| r.source_stamp == stamp && r.cleanup.is_some())
-        } else {
-            state.receipts.iter().any(|(receipt_key, receipt)| {
-                receipt_key.starts_with(&format!("{key}:")) && receipt.source_stamp == stamp && receipt.cleanup.is_some()
-            })
-        };
-        if observation.attempted && !pending_cleanup {
-            return Ok(());
+    let publication_time = state.tasks.get(&task.id).and_then(|status| status.attempt_started_at).unwrap_or(current);
+    let prepared = prepare_ready(&cx, state, ready, &queue.remote, publication_time, check_models)?;
+    if prepared.is_empty() {
+        return Ok(());
+    }
+    let result = save_prepared(&cx, state, &prepared, publication_time)?;
+    record_receipts(&cx, state, &prepared, result)?;
+    finish_sources(&cx, state, prepared, &queue.proofs)
+}
+
+fn stage_remote(cx: &StepContext, state: &mut State) -> Result<StagedQueue, String> {
+    let task = cx.task;
+    let staged = sources::stage(&task.source, &cx.input, cx.root, cx.stopped, &cx.store)?;
+    if staged.has_more && task.output_plan.needs_batch() {
+        return Err("combined remote queue exceeds 128 files or 512 MiB; choose a smaller source or per-file outputs".into());
+    }
+    for warning in staged.warnings {
+        state.log.push(LogEntry { at: now(), task: task.id.clone(), input: None, output: None, error: Some(warning) });
+    }
+    for item in &staged.pending_acknowledgements {
+        let path = confined(&cx.input.join(&item.staged_relative), cx.root)?;
+        let key = format!("{}:{}:{}", task.id, path.display(), item.sha256);
+        let receipt =
+            journal::receipt(cx.config_path, state, &key)?.ok_or("pending source acknowledgement has no saved-output receipt; original retained")?;
+        verify_outputs(&receipt, cx.root)?;
+    }
+    let mut items = staged.items;
+    items.extend(staged.pending_acknowledgements);
+    let mut queue = StagedQueue::default();
+    // A final Outlook acknowledgement may consume the whole message. Verify every
+    // earlier ready attachment's outputs before acknowledging any of its peers.
+    for item in &items {
+        let path = confined(&cx.input.join(&item.staged_relative), cx.root)?;
+        let key = format!("{}:{}:{}", task.id, path.display(), item.sha256);
+        if let Some(receipt) = journal::receipt(cx.config_path, state, &key)? {
+            verify_outputs(&receipt, cx.root)?;
+            queue.proofs.push(receipt.clone());
         }
-        waiting = waiting.saturating_add(1);
-        let selected = current.saturating_sub(observation.since) >= task.settle_seconds;
-        if changed || selected {
-            state.observations.insert(key.clone(), observation);
+    }
+    if !matches!(task.source, sources::SourceConfig::Project(_)) {
+        items.sort_by(|a, b| a.relative.cmp(&b.relative));
+    }
+    for item in items {
+        if let Some((path, item)) = queue_staged(cx, state, item, &queue.proofs)? {
+            queue.remote.insert(path.clone(), item);
+            queue.candidates.push(path);
         }
-        if selected {
-            if batch {
-                if ready.len() < 129 {
-                    ready.push((path, key, stamp));
-                }
-            } else if ready.first().is_none_or(|(first, _, _)| path < *first) {
-                ready.clear();
-                ready.push((path, key, stamp));
-            }
+    }
+    Ok(queue)
+}
+
+/// The candidate path of one staged item, or `None` once it was already saved (its
+/// acknowledgement is recovered here) or is a file type this task doesn't process.
+fn queue_staged(
+    cx: &StepContext,
+    state: &mut State,
+    item: sources::StagedSource,
+    proofs: &[Receipt],
+) -> Result<Option<(PathBuf, sources::StagedSource)>, String> {
+    let task = cx.task;
+    let path = confined(&cx.input.join(&item.staged_relative), cx.root)?;
+    if !path.starts_with(&cx.input) {
+        return Err("staged source escaped its inbox".into());
+    }
+    let key = format!("{}:{}", task.id, path.display());
+    // Recover a failed/interrupted acknowledgement without rerunning OCR or saving duplicates.
+    if journal::receipt(cx.config_path, state, &format!("{key}:{}", item.sha256))?.is_some() {
+        for receipt in proofs {
+            verify_outputs(receipt, cx.root)?;
         }
-        visited = visited.saturating_add(1);
-        if visited.is_multiple_of(256) {
-            journal::save(config_path, state)?;
-        }
-        Ok(())
-    };
+        sources::acknowledge(&task.source, &cx.input, &item, &item.sha256, cx.root, cx.stopped, &cx.store)?;
+        remove_staged(&path, &item.sha256)?;
+        return Ok(None);
+    }
+    let ext = item.relative.extension().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+    let wanted = task.pdf && ext == "pdf" || task.images && matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "tif" | "tiff" | "bmp");
+    Ok(wanted.then_some((path, item)))
+}
+
+/// The settled inputs to process now, or `None` when there is nothing to do yet.
+fn select_ready(
+    cx: &StepContext,
+    state: &mut State,
+    current: u64,
+    should_stop: &dyn Fn() -> bool,
+    candidates: Vec<PathBuf>,
+) -> Result<Option<Vec<ReadyInput>>, String> {
+    let task = cx.task;
+    let mut selection = Selection::default();
     if matches!(task.source, sources::SourceConfig::Local) {
-        visit_files(task, root, should_stop, &mut consider)?;
+        visit_files(task, cx.root, should_stop, &mut |path| consider(cx, state, current, &mut selection, path))?;
+        selection.ready.sort_by(|a, b| a.0.cmp(&b.0));
     } else {
         for path in candidates {
-            consider(path)?;
+            consider(cx, state, current, &mut selection, path)?;
         }
     }
-    if matches!(task.source, sources::SourceConfig::Local) {
-        ready.sort_by(|a, b| a.0.cmp(&b.0));
-    }
+    let Selection { ready, waiting, .. } = selection;
     let status = state.tasks.entry(task.id.clone()).or_default();
     status.waiting = waiting;
     if ready.is_empty() && waiting == 0 && task.once {
@@ -1069,104 +1098,191 @@ fn step_with_model_check(
         status.blocked = true;
         return Err("combined batch exceeds 128 files; split the task or use one output per file".into());
     }
-    if ready.is_empty() || batch && ready.len() != waiting {
+    if ready.is_empty() || task.output_plan.needs_batch() && ready.len() != waiting {
+        return Ok(None);
+    }
+    Ok(Some(ready))
+}
+
+fn consider(cx: &StepContext, state: &mut State, current: u64, selection: &mut Selection, path: PathBuf) -> Result<(), String> {
+    let task = cx.task;
+    let key = format!("{}:{}", task.id, path.display());
+    let stamp = fingerprint(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let previous = journal::observation(cx.config_path, state, &key)?;
+    let changed = previous.as_ref().is_none_or(|observation| observation.fingerprint != stamp);
+    let observation = if changed {
+        Observation { fingerprint: stamp.clone(), since: current, attempted: false, receipt_key: None }
+    } else {
+        previous.ok_or("source observation unavailable")?
+    };
+    let pending_cleanup = if let Some(receipt_key) = &observation.receipt_key {
+        journal::receipt(cx.config_path, state, receipt_key)?.is_some_and(|r| r.source_stamp == stamp && r.cleanup.is_some())
+    } else {
+        state
+            .receipts
+            .iter()
+            .any(|(receipt_key, receipt)| receipt_key.starts_with(&format!("{key}:")) && receipt.source_stamp == stamp && receipt.cleanup.is_some())
+    };
+    if observation.attempted && !pending_cleanup {
         return Ok(());
     }
-    let publication_time = state.tasks.get(&task.id).and_then(|status| status.attempt_started_at).unwrap_or(current);
+    selection.waiting = selection.waiting.saturating_add(1);
+    let selected = current.saturating_sub(observation.since) >= task.settle_seconds;
+    if changed || selected {
+        state.observations.insert(key.clone(), observation);
+    }
+    if selected {
+        let ready = &mut selection.ready;
+        if task.output_plan.needs_batch() {
+            if ready.len() < 129 {
+                ready.push((path, key, stamp));
+            }
+        } else if ready.first().is_none_or(|(first, _, _)| path < *first) {
+            ready.clear();
+            ready.push((path, key, stamp));
+        }
+    }
+    selection.visited = selection.visited.saturating_add(1);
+    if selection.visited.is_multiple_of(256) {
+        journal::save(cx.config_path, state)?;
+    }
+    Ok(())
+}
+
+fn prepare_ready(
+    cx: &StepContext,
+    state: &mut State,
+    ready: Vec<ReadyInput>,
+    remote: &BTreeMap<PathBuf, sources::StagedSource>,
+    publication_time: u64,
+    check_models: &dyn Fn() -> Result<(), String>,
+) -> Result<Vec<Prepared>, String> {
     let mut prepared = Vec::new();
-    let mut prepared_bytes = 0_u64;
-    let mut total = 0u64;
-    for (source, key, stamp) in ready {
-        if task_stopped() {
-            return Err("task stopped; no partial output was saved".into());
+    let mut budget = Budget::default();
+    for entry in ready {
+        if let Some(file) = prepare_one(cx, state, entry, remote, &mut budget, publication_time, check_models)? {
+            prepared.push(file);
         }
-        if !state.observations.contains_key(&key) {
-            let observation = journal::observation(config_path, state, &key)?.ok_or("source observation unavailable")?;
-            state.observations.insert(key.clone(), observation);
-        }
-        state.tasks.entry(task.id.clone()).or_default().last_input = Some(source.clone());
-        let file = File::open(&source).map_err(|e| e.to_string())?;
-        let length = file.metadata().map_err(|e| e.to_string())?.len();
-        total = total.saturating_add(length);
-        if length == 0 || total > MAX_INPUT {
-            if let Some(o) = state.observations.get_mut(&key) {
-                o.attempted = true;
-            }
-            state.tasks.entry(task.id.clone()).or_default().blocked = batch;
-            return Err("input or combined batch must contain 1 byte to 512 MiB; sources retained".into());
-        }
-        let mut bytes = Vec::new();
-        file.take(MAX_INPUT + 1).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
-        if bytes.len() as u64 > MAX_INPUT || fingerprint(&source)? != stamp {
-            return Err("input changed while being read; waiting for a stable copy".into());
-        }
-        let hash: String = Sha256::digest(&bytes).iter().map(|byte| format!("{byte:02x}")).collect();
-        let receipt_key = format!("{key}:{hash}");
-        if let Some(receipt) = journal::receipt(config_path, state, &receipt_key)? {
-            state.receipts.insert(receipt_key.clone(), receipt.clone());
-            if let Some(cleanup) = &receipt.cleanup {
-                verify_outputs(&receipt, root)?;
-                finish_original(&source, &hash, cleanup, task, root, &task_stopped)?;
-                if let Some(receipt) = state.receipts.get_mut(&receipt_key) {
-                    receipt.cleanup = None;
-                }
-                journal::save(config_path, state)?;
-            }
-            if let Some(o) = state.observations.get_mut(&key) {
-                o.attempted = true;
-            }
-            state.tasks.entry(task.id.clone()).or_default().waiting = state.tasks.get(&task.id).map_or(0, |s| s.waiting.saturating_sub(1));
-            continue;
-        }
-        // Completed receipts need only verified cleanup, even when the models are unavailable.
-        // New work still treats missing models as an environment failure, not a permanent bad input.
-        if !task.analysis_only && (task.settings.recognize || task.settings.auto_rotate || task.settings.deskew || task.settings.auto_crop) {
-            check_models()?;
-        }
-        let processed = match prepare(task, &source, bytes, config_path, MAX_INPUT.saturating_sub(prepared_bytes), publication_time, &task_stopped) {
-            Ok(bytes) => bytes,
-            Err(e) => {
-                if !task_stopped()
-                    && let Some(o) = state.observations.get_mut(&key)
-                {
-                    o.attempted = true;
-                    state.tasks.entry(task.id.clone()).or_default().blocked = batch;
-                }
-                return Err(e);
-            }
-        };
-        if fingerprint(&source)? != stamp {
-            return Err("input changed during processing; sources retained".into());
-        }
-        let expanded =
-            processed.document.as_ref().map_or(0, |v| v.len() as u64).saturating_add(processed.blank_pages.as_ref().map_or(0, |v| v.len() as u64));
-        prepared_bytes = prepared_bytes.saturating_add(expanded);
-        if prepared_bytes > MAX_INPUT {
-            state.tasks.entry(task.id.clone()).or_default().blocked = batch;
-            if let Some(observation) = state.observations.get_mut(&key) {
-                observation.attempted = true;
-            }
-            return Err("prepared batch exceeds 512 MiB; lower resolution or split the batch; originals retained".into());
-        }
-        prepared.push(Prepared {
-            relative: remote.get(&source).map(|item| item.relative.clone()).unwrap_or(source.strip_prefix(&input).map_err(|e| e.to_string())?.into()),
-            remote: remote.get(&source).cloned(),
-            processed: processed.document,
-            blank_pages: processed.blank_pages,
-            source,
-            key,
-            stamp,
-            hash,
-        });
     }
-    if prepared.is_empty() {
-        return Ok(());
-    }
-    let stopped = &task_stopped;
-    if stopped() {
+    Ok(prepared)
+}
+
+/// One input prepared for saving, or `None` when an earlier step already saved it (its
+/// pending cleanup finishes here).
+fn prepare_one(
+    cx: &StepContext,
+    state: &mut State,
+    (source, key, stamp): ReadyInput,
+    remote: &BTreeMap<PathBuf, sources::StagedSource>,
+    budget: &mut Budget,
+    publication_time: u64,
+    check_models: &dyn Fn() -> Result<(), String>,
+) -> Result<Option<Prepared>, String> {
+    let task = cx.task;
+    let batch = task.output_plan.needs_batch();
+    if (cx.stopped)() {
         return Err("task stopped; no partial output was saved".into());
     }
-    for file in &prepared {
+    if !state.observations.contains_key(&key) {
+        let observation = journal::observation(cx.config_path, state, &key)?.ok_or("source observation unavailable")?;
+        state.observations.insert(key.clone(), observation);
+    }
+    state.tasks.entry(task.id.clone()).or_default().last_input = Some(source.clone());
+    let bytes = read_input(cx, state, &source, &key, &stamp, budget)?;
+    let hash: String = Sha256::digest(&bytes).iter().map(|byte| format!("{byte:02x}")).collect();
+    if let Some(receipt) = journal::receipt(cx.config_path, state, &format!("{key}:{hash}"))? {
+        finish_receipted(cx, state, &source, &key, &hash, receipt)?;
+        return Ok(None);
+    }
+    // Completed receipts need only verified cleanup, even when the models are unavailable.
+    // New work still treats missing models as an environment failure, not a permanent bad input.
+    if !task.analysis_only && (task.settings.recognize || task.settings.auto_rotate || task.settings.deskew || task.settings.auto_crop) {
+        check_models()?;
+    }
+    let processed = match prepare(task, &source, bytes, cx.config_path, MAX_INPUT.saturating_sub(budget.prepared), publication_time, cx.stopped) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            if !(cx.stopped)()
+                && let Some(o) = state.observations.get_mut(&key)
+            {
+                o.attempted = true;
+                state.tasks.entry(task.id.clone()).or_default().blocked = batch;
+            }
+            return Err(e);
+        }
+    };
+    if fingerprint(&source)? != stamp {
+        return Err("input changed during processing; sources retained".into());
+    }
+    let expanded =
+        processed.document.as_ref().map_or(0, |v| v.len() as u64).saturating_add(processed.blank_pages.as_ref().map_or(0, |v| v.len() as u64));
+    budget.prepared = budget.prepared.saturating_add(expanded);
+    if budget.prepared > MAX_INPUT {
+        state.tasks.entry(task.id.clone()).or_default().blocked = batch;
+        if let Some(observation) = state.observations.get_mut(&key) {
+            observation.attempted = true;
+        }
+        return Err("prepared batch exceeds 512 MiB; lower resolution or split the batch; originals retained".into());
+    }
+    Ok(Some(Prepared {
+        relative: remote.get(&source).map(|item| item.relative.clone()).unwrap_or(source.strip_prefix(&cx.input).map_err(|e| e.to_string())?.into()),
+        remote: remote.get(&source).cloned(),
+        processed: processed.document,
+        blank_pages: processed.blank_pages,
+        source,
+        key,
+        stamp,
+        hash,
+    }))
+}
+
+/// The bytes of one stable input, counted against the step's 512 MiB input budget.
+fn read_input(cx: &StepContext, state: &mut State, source: &Path, key: &str, stamp: &str, budget: &mut Budget) -> Result<Vec<u8>, String> {
+    let file = File::open(source).map_err(|e| e.to_string())?;
+    let length = file.metadata().map_err(|e| e.to_string())?.len();
+    budget.read = budget.read.saturating_add(length);
+    if length == 0 || budget.read > MAX_INPUT {
+        if let Some(o) = state.observations.get_mut(key) {
+            o.attempted = true;
+        }
+        state.tasks.entry(cx.task.id.clone()).or_default().blocked = cx.task.output_plan.needs_batch();
+        return Err("input or combined batch must contain 1 byte to 512 MiB; sources retained".into());
+    }
+    let mut bytes = Vec::new();
+    file.take(MAX_INPUT + 1).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+    if bytes.len() as u64 > MAX_INPUT || fingerprint(source)? != stamp {
+        return Err("input changed while being read; waiting for a stable copy".into());
+    }
+    Ok(bytes)
+}
+
+/// Finishes an input whose outputs an earlier step saved: only its verified cleanup remains.
+fn finish_receipted(cx: &StepContext, state: &mut State, source: &Path, key: &str, hash: &str, receipt: Receipt) -> Result<(), String> {
+    let task = cx.task;
+    let receipt_key = format!("{key}:{hash}");
+    state.receipts.insert(receipt_key.clone(), receipt.clone());
+    if let Some(cleanup) = &receipt.cleanup {
+        verify_outputs(&receipt, cx.root)?;
+        finish_original(source, hash, cleanup, task, cx.root, cx.stopped)?;
+        if let Some(receipt) = state.receipts.get_mut(&receipt_key) {
+            receipt.cleanup = None;
+        }
+        journal::save(cx.config_path, state)?;
+    }
+    if let Some(o) = state.observations.get_mut(key) {
+        o.attempted = true;
+    }
+    state.tasks.entry(task.id.clone()).or_default().waiting = state.tasks.get(&task.id).map_or(0, |s| s.waiting.saturating_sub(1));
+    Ok(())
+}
+
+/// Saves the prepared inputs' outputs and blank-page archive, and checks every published proof.
+fn save_prepared(cx: &StepContext, state: &mut State, prepared: &[Prepared], publication_time: u64) -> Result<output::OutputReceipt, String> {
+    let task = cx.task;
+    if (cx.stopped)() {
+        return Err("task stopped; no partial output was saved".into());
+    }
+    for file in prepared {
         if fingerprint(&file.source)? != file.stamp {
             return Err("input changed before saving; sources retained".into());
         }
@@ -1188,71 +1304,90 @@ fn step_with_model_check(
                 step.language = task.settings.language.clone();
             }
         }
-        output::save(&inputs, &output, &plan, &task.name, publication_time, root, &stopped)
+        output::save(&inputs, &cx.output, &plan, &task.name, publication_time, cx.root, cx.stopped)
     };
-    let mut result = match primary {
+    let result = match primary {
         Ok(result) => result,
         Err(error) => {
-            for path in error.outputs {
-                state.log.push(LogEntry { at: now(), task: task.id.clone(), input: None, output: Some(path), error: Some(error.message.clone()) });
-            }
-            for file in &prepared {
-                if let Some(o) = state.observations.get_mut(&file.key) {
-                    o.attempted = !stopped() && !error.retryable;
-                }
-            }
-            state.tasks.entry(task.id.clone()).or_default().blocked = batch && !error.retryable && !stopped();
+            record_save_failure(cx, state, prepared, error.outputs, &error.message, error.retryable);
             return Err(format!("{}; all originals retained", error.message));
         }
     };
-    if let Some(archive) = &task.blank_archive {
-        let blanks: Vec<_> = prepared
-            .iter()
-            .filter_map(|p| p.blank_pages.as_ref().map(|bytes| output::Input { relative: p.relative.clone(), bytes: bytes.clone() }))
-            .collect();
-        if !blanks.is_empty() {
-            let plan = OutputPlan { steps: vec![output::SaveStep { name_template: "{name}_blank_pages".into(), ..Default::default() }] };
-            match output::save(&blanks, archive, &plan, &task.name, publication_time, root, &stopped) {
-                Ok(saved) => {
-                    result.outputs.extend(saved.outputs);
-                    result.proofs.extend(saved.proofs);
-                    result.warnings.extend(saved.warnings);
-                    result.optimizations.extend(saved.optimizations);
-                }
-                Err(error) => {
-                    for path in result.outputs.into_iter().chain(error.outputs) {
-                        state.log.push(LogEntry {
-                            at: now(),
-                            task: task.id.clone(),
-                            input: None,
-                            output: Some(path),
-                            error: Some(error.message.clone()),
-                        });
-                    }
-                    for file in &prepared {
-                        if let Some(o) = state.observations.get_mut(&file.key) {
-                            o.attempted = !stopped() && !error.retryable;
-                        }
-                    }
-                    state.tasks.entry(task.id.clone()).or_default().blocked = batch && !error.retryable && !stopped();
-                    return Err(format!("blank-page archive failed: {}; all originals retained", error.message));
-                }
-            }
-        }
-    }
+    let result = save_blank_pages(cx, state, prepared, publication_time, result)?;
     for proof in &result.proofs {
-        if output_proof(&proof.path, root)? != *proof {
+        if output_proof(&proof.path, cx.root)? != *proof {
             return Err("published output no longer matches the export; all originals retained".into());
         }
     }
-    for file in &prepared {
+    Ok(result)
+}
+
+fn save_blank_pages(
+    cx: &StepContext,
+    state: &mut State,
+    prepared: &[Prepared],
+    publication_time: u64,
+    mut result: output::OutputReceipt,
+) -> Result<output::OutputReceipt, String> {
+    let Some(archive) = &cx.task.blank_archive else {
+        return Ok(result);
+    };
+    let blanks: Vec<_> = prepared
+        .iter()
+        .filter_map(|p| p.blank_pages.as_ref().map(|bytes| output::Input { relative: p.relative.clone(), bytes: bytes.clone() }))
+        .collect();
+    if blanks.is_empty() {
+        return Ok(result);
+    }
+    let plan = OutputPlan { steps: vec![output::SaveStep { name_template: "{name}_blank_pages".into(), ..Default::default() }] };
+    match output::save(&blanks, archive, &plan, &cx.task.name, publication_time, cx.root, cx.stopped) {
+        Ok(saved) => {
+            result.outputs.extend(saved.outputs);
+            result.proofs.extend(saved.proofs);
+            result.warnings.extend(saved.warnings);
+            result.optimizations.extend(saved.optimizations);
+            Ok(result)
+        }
+        Err(error) => {
+            record_save_failure(cx, state, prepared, result.outputs.into_iter().chain(error.outputs), &error.message, error.retryable);
+            Err(format!("blank-page archive failed: {}; all originals retained", error.message))
+        }
+    }
+}
+
+/// Logs the outputs a failed save left behind and marks its inputs so they retry only when
+/// the failure can recover.
+fn record_save_failure(
+    cx: &StepContext,
+    state: &mut State,
+    prepared: &[Prepared],
+    outputs: impl IntoIterator<Item = PathBuf>,
+    message: &str,
+    retryable: bool,
+) {
+    let task = cx.task;
+    for path in outputs {
+        state.log.push(LogEntry { at: now(), task: task.id.clone(), input: None, output: Some(path), error: Some(message.to_owned()) });
+    }
+    for file in prepared {
+        if let Some(o) = state.observations.get_mut(&file.key) {
+            o.attempted = !(cx.stopped)() && !retryable;
+        }
+    }
+    state.tasks.entry(task.id.clone()).or_default().blocked = task.output_plan.needs_batch() && !retryable && !(cx.stopped)();
+}
+
+/// Records a receipt per saved input and makes them durable before any source action.
+fn record_receipts(cx: &StepContext, state: &mut State, prepared: &[Prepared], result: output::OutputReceipt) -> Result<(), String> {
+    let task = cx.task;
+    for file in prepared {
         let cleanup = if file.remote.is_some() {
             None
         } else {
             match task.originals {
                 Originals::Keep => None,
                 Originals::Delete => Some(PendingLocalAction::Delete),
-                Originals::Move => Some(PendingLocalAction::Move { archive: confined(&task.archive, root)?, relative: file.relative.clone() }),
+                Originals::Move => Some(PendingLocalAction::Move { archive: confined(&task.archive, cx.root)?, relative: file.relative.clone() }),
             }
         };
         state.receipts.insert(
@@ -1290,34 +1425,39 @@ fn step_with_model_check(
     status.error = None;
     status.waiting = status.waiting.saturating_sub(prepared.len());
     // All outputs and their receipts are durable before any source move/delete is attempted.
-    journal::save(config_path, state)?;
+    journal::save(cx.config_path, state)
+}
+
+/// Acknowledges remote sources and moves or deletes local originals, each only after its
+/// outputs verify.
+fn finish_sources(cx: &StepContext, state: &mut State, prepared: Vec<Prepared>, proofs: &[Receipt]) -> Result<(), String> {
+    let task = cx.task;
     for file in prepared {
-        if stopped() {
+        if (cx.stopped)() {
             return Err("task stopped after outputs were saved; remaining original actions will resume on retry".into());
         }
         let receipt_key = format!("{}:{}", file.key, file.hash);
-        let receipt = journal::receipt(config_path, state, &receipt_key)?.ok_or("output receipt unavailable; original retained")?;
+        let receipt = journal::receipt(cx.config_path, state, &receipt_key)?.ok_or("output receipt unavailable; original retained")?;
         if file.remote.is_some() || receipt.cleanup.is_some() {
-            verify_outputs(&receipt, root)?;
+            verify_outputs(&receipt, cx.root)?;
         }
         state.receipts.insert(receipt_key.clone(), receipt);
         if let Some(remote) = &file.remote {
             // A previous ready attachment's output may have changed during lengthy OCR
             // of this final attachment. Recheck the whole pending group at the action.
-            for receipt in &acknowledgement_proofs {
-                verify_outputs(receipt, root)?;
+            for receipt in proofs {
+                verify_outputs(receipt, cx.root)?;
             }
-            sources::acknowledge(&task.source, &input, remote, &file.hash, root, &stopped, &store)?;
+            sources::acknowledge(&task.source, &cx.input, remote, &file.hash, cx.root, cx.stopped, &cx.store)?;
             remove_staged(&file.source, &file.hash)?;
             continue;
         }
-        let key = format!("{}:{}", file.key, file.hash);
-        if let Some(action) = state.receipts.get(&key).and_then(|r| r.cleanup.clone()) {
-            finish_original(&file.source, &file.hash, &action, task, root, &stopped)?;
-            if let Some(receipt) = state.receipts.get_mut(&key) {
+        if let Some(action) = state.receipts.get(&receipt_key).and_then(|r| r.cleanup.clone()) {
+            finish_original(&file.source, &file.hash, &action, task, cx.root, cx.stopped)?;
+            if let Some(receipt) = state.receipts.get_mut(&receipt_key) {
                 receipt.cleanup = None;
             }
-            journal::save(config_path, state)?;
+            journal::save(cx.config_path, state)?;
         }
     }
     Ok(())

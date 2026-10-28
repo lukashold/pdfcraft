@@ -1,7 +1,10 @@
 //! Small active journal plus durable, sharded history. Historical receipts are never
 //! discarded to make room: an evicted source version must remain deduplicated after restart.
 //! Individual reads/writes and the hot cache are bounded; disk history grows with unique work.
-use super::*;
+use super::{
+    BTreeMap, Deserialize, Digest, File, Observation, Path, PathBuf, Read, Receipt, Serialize, Sha256, State, fs, read_json, save_bytes, save_json,
+    state_path, sync_parent,
+};
 
 const HOT_ENTRIES: usize = 256;
 const HOT_BYTES: usize = 2 * 1024 * 1024;

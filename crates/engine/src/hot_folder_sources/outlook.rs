@@ -1,7 +1,10 @@
 //! Microsoft Graph delegated device-code flow. Tokens/device secrets stay in the selected protected store.
 //! Global Microsoft cloud endpoints are fixed; pagination cannot redirect credentials.
 
-use super::*;
+use super::{
+    Backend, Control, CredentialStore, Deserialize, Duration, MAX_BATCH, MAX_FILE, MAX_ITEMS, MAX_JSON, OutlookSource, PathBuf, Record, RemoteFile,
+    Serialize, SourceAction, Write, copy_limited, credentials, guarded, hash, io_error, safe_filename, supported,
+};
 use serde_json::{Value, json};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
@@ -594,6 +597,7 @@ impl Backend for Client<'_> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::StagedSource;
     use super::*;
     use std::cell::RefCell;
     use std::collections::VecDeque;

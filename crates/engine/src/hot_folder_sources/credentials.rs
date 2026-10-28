@@ -252,7 +252,10 @@ fn windows_private(path: &Path, directory: bool) -> Result<(), String> {
 
 #[cfg(windows)]
 fn windows_service_account_sid() -> Option<windows_permissions::LocalBox<windows_permissions::Sid>> {
-    use windows_service::{service::ServiceAccess, service_manager::*};
+    use windows_service::{
+        service::ServiceAccess,
+        service_manager::{ServiceManager, ServiceManagerAccess},
+    };
     // Trust only SCM's administrator-controlled Log On identity, never a SID in
     // task JSON or an arbitrary owner. Domain lookup runs inside the bounded child.
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT).ok()?;
