@@ -178,7 +178,8 @@ implicitly starts a service or background process. `hot_folder_project` writes o
 project manifests; `hot_folder_source` provides explicit remote authentication and folder discovery.
 FTP passwords enter through named environment variables, never through replayable tool arguments.
 `hot_folder_service` explicitly controls an installed boot service and refuses mutations under
-`--root`. See [the configuration and scope guide](../../docs/hot-folder.md).
+`--root`. Under `pdfcraft-cli mcp`, service changes and credential changes also need
+`--allow-hot-folder-admin` (`Automation::with_hot_folder_admin`). See [the configuration and scope guide](../../docs/hot-folder.md).
 PDF saving steps accept `optimization.mode` (`off`, the default; `lossless`; `reduce`; or
 `custom` with separate color/grayscale DPI and compression choices). All tools and the
 standalone UI use the same validation, cancellable optimizer and smaller-only publication

@@ -117,6 +117,9 @@ use the supported shared `--root` confinement instead.
 `hot_folder_project` writes an ordered open manifest without replacing existing files.
 `hot_folder_source` provides credential status/removal, FTP password storage from a named environment
 variable, Outlook device sign-in and folder listing. Secrets never appear in tool results or task JSON.
+`pdfcraft-cli mcp` refuses every service action except `status`, and saving, signing in or forgetting
+source credentials, unless the user starts it with `--allow-hot-folder-admin`; reading the service and
+credential status, and `pdfcraft-cli run` scripts, are unaffected.
 
 Each PDF `output_plan.steps` entry accepts an `optimization` object. It is omitted or
 `{"mode":"off"}` for the original behavior. Modes are `off`, `lossless`, `reduce` and `custom`.

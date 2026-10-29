@@ -27,6 +27,17 @@ impl Automation {
         Ok(())
     }
 
+    /// Refuses Hot Folder administration in a session that was not given it.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn check_hot_folder_admin(&self) -> Result<()> {
+        if self.hot_folder_admin {
+            return Ok(());
+        }
+        Err(failed(
+            "Hot Folder administration (system service changes and stored source credentials) is off in this session;              start pdfcraft-cli mcp with --allow-hot-folder-admin to allow it",
+        ))
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn hot_folder_project(&self, args: &Args) -> Result<Value> {
         self.check_hot_folder_roots()?;
@@ -63,7 +74,11 @@ impl Automation {
             _ => return Err(failed("this task has no authenticated remote source")),
         };
         let action = args.str("action")?;
-        if task.enabled && matches!(action, "save_ftp_password" | "forget_credentials" | "outlook_begin" | "outlook_poll") {
+        let changes_credentials = matches!(action, "save_ftp_password" | "forget_credentials" | "outlook_begin" | "outlook_poll");
+        if changes_credentials {
+            self.check_hot_folder_admin()?;
+        }
+        if task.enabled && changes_credentials {
             return Err(failed("stop the task before changing its credentials"));
         }
         let store = source::CredentialStore::for_config(&path, self.root.as_deref()).map_err(failed)?;

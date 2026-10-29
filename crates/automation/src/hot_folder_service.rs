@@ -12,6 +12,9 @@ impl Automation {
                 "System service changes are unavailable in a filesystem-confined session; run an explicit unrestricted administration command",
             ));
         }
+        if action != "status" {
+            self.check_hot_folder_admin()?;
+        }
         let executable = self.resolve(args.str("executable")?, false)?;
         let config = self.resolve(args.str("config")?, false)?;
         match action {
@@ -49,6 +52,22 @@ mod tests {
                 let value = json!({"action":action,"executable":"unneeded","config":"unneeded","account":"root"});
                 assert!(automation.hot_folder_service(&Args(&value)).unwrap_err().to_string().contains("confined"));
             }
+        }
+    }
+
+    #[test]
+    fn system_changes_need_hot_folder_admin() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = dir.path().join("tasks.json");
+        let automation = Automation::new().with_hot_folder_admin(false);
+        for action in ["start", "stop", "enable", "disable", "install", "uninstall", "prepare-account"] {
+            let value = json!({"action":action,"executable":"unneeded","config":config,"account":"root"});
+            assert!(automation.hot_folder_service(&Args(&value)).unwrap_err().to_string().contains("--allow-hot-folder-admin"), "{action}");
+        }
+        // Reading the status never needs it.
+        let value = json!({"action":"status","executable":"unneeded","config":config});
+        if let Err(error) = automation.hot_folder_service(&Args(&value)) {
+            assert!(!error.to_string().contains("--allow-hot-folder-admin"), "{error}");
         }
     }
 

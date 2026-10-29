@@ -312,3 +312,25 @@ fn hot_folder_refuses_split_roots_before_writing_configuration() {
         assert!(!config.exists());
     }
 }
+
+#[test]
+fn credential_changes_need_hot_folder_admin() {
+    // Removed when the test ends, pass or fail.
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().to_path_buf();
+    std::fs::create_dir_all(root.join("in")).unwrap();
+    std::fs::create_dir_all(root.join("out")).unwrap();
+    let mut a = Automation::new().with_root(&root).unwrap().with_hot_folder_admin(false);
+    let task = json!({"id":"scanner", "name":"Scanner", "input":"in", "output":"out", "enabled":false,
+        "source":{"kind":"ftp","host":"example.test","username":"scan","credential_id":"ftp-scanner"}});
+    call(&mut a, "hot_folder_configure", json!({"config":"tasks.json","settings":{"tasks":[task]}}));
+    for action in ["save_ftp_password", "forget_credentials", "outlook_begin", "outlook_poll"] {
+        let args = json!({"config":"tasks.json","task":"scanner","action":action,"password_env":"PDFCRAFT_HOT_FOLDER_UNUSED"});
+        let error = a.call("hot_folder_source", &args).unwrap_err();
+        assert!(error.to_string().contains("--allow-hot-folder-admin"), "{action}: {error}");
+    }
+    // Reading whether a credential exists never needs it.
+    if let Err(error) = a.call("hot_folder_source", &json!({"config":"tasks.json","task":"scanner","action":"credential_status"})) {
+        assert!(!error.to_string().contains("--allow-hot-folder-admin"), "{error}");
+    }
+}
