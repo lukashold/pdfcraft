@@ -698,8 +698,16 @@ fn image_stream(old: &Dict, px: &[u8], n: usize, w: u32, h: u32, compression: Co
 }
 
 /// One image: resample and/or recompress per `settings`; `ppi` is its effective resolution.
-/// Returns the new image and its new soft mask, if the result is smaller.
-fn process(doc: &Document, s: &Stream, ppi: f64, settings: &ImageSettings, n: usize) -> Option<(Stream, Option<Stream>)> {
+/// Returns the new image and its new soft mask, if the result is smaller. `mask_users` counts the
+/// images referring to each soft mask.
+fn process(
+    doc: &Document,
+    s: &Stream,
+    ppi: f64,
+    settings: &ImageSettings,
+    n: usize,
+    mask_users: &HashMap<ObjRef, usize>,
+) -> Option<(Stream, Option<Stream>)> {
     let d = &s.dict;
     if d.get(b"Decode").is_some_and(|a| !is_identity_decode(doc, a, n))
         || d.contains(b"Mask")
@@ -739,6 +747,7 @@ fn process(doc: &Document, s: &Stream, ppi: f64, settings: &ImageSettings, n: us
     let new = image_stream(d, &px, n, nw, nh, settings.compression, was_dct)?;
     // A soft mask must keep the image's dimensions: resample it with the image (lossless).
     let mut smask = None;
+    let mut replaced_mask = 0;
     if let Some(mr) = d.reference(b"SMask") {
         let mobj = doc.get(mr);
         let Object::Stream(m) = &*mobj else { return None };
@@ -750,11 +759,14 @@ fn process(doc: &Document, s: &Stream, ppi: f64, settings: &ImageSettings, n: us
             let mpx = pixels(doc, m, 1)?;
             let mpx = resample(&mpx, 1, mw, mh, nw, nh)?;
             smask = Some(image_stream(&m.dict, &mpx, 1, nw, nh, Compression::Flate, false)?);
+            if mask_users.get(&mr).copied().unwrap_or(0) <= 1 {
+                replaced_mask = m.raw.len();
+            }
         }
     }
-    // The original mask may have other users. Budget the new private mask without claiming
-    // any saving from deleting the original (even if a later full save can collect it).
-    let before = s.raw.len();
+    // The original mask stays for its other users; only a mask no other image refers to is
+    // replaced, and counted as saved (a full save collects it).
+    let before = s.raw.len().checked_add(replaced_mask)?;
     let after = new.raw.len().checked_add(smask.as_ref().map_or(0, |m| m.raw.len()))?;
     (after < before).then_some((new, smask))
 }
@@ -1115,6 +1127,15 @@ pub(crate) fn run(
     progress: &mut dyn FnMut(Stage) -> bool,
 ) -> Result<(), OptimizeError> {
     let (ppi, mut defaults, read) = walk_pages(doc, pages);
+    let mut mask_users: HashMap<ObjRef, usize> = HashMap::new();
+    for num in doc.object_numbers() {
+        let r = ObjRef { num, generation: doc.generation(num) };
+        if let Object::Stream(s) = &*doc.get(r)
+            && let Some(m) = s.dict.reference(b"SMask")
+        {
+            *mask_users.entry(m).or_default() += 1;
+        }
+    }
     // Black-and-white RGB becomes grey, which default colour spaces would draw otherwise: one used
     // where the walk didn't look may be drawn so.
     let packs = settings.mono.compression != MonoCompression::Retain;
@@ -1159,7 +1180,7 @@ pub(crate) fn run(
             continue;
         }
         let n = s.dict.get(b"ColorSpace").and_then(|cs| components(doc, cs));
-        let processed = n.and_then(|n| process(doc, s, ppi, if n == 1 { &settings.gray } else { &settings.color }, n));
+        let processed = n.and_then(|n| process(doc, s, ppi, if n == 1 { &settings.gray } else { &settings.color }, n, &mask_users));
         // A dithered scan, say, downsampled and JPEG-compressed: the smaller wins, counting a soft
         // mask resampled with it.
         let smask_len = |smask: Option<&Stream>| match smask {
@@ -1195,6 +1216,11 @@ pub(crate) fn run(
             report.images_recompressed += 1;
         }
         if let Some(m) = smask {
+            if let Some(old) = s.dict.reference(b"SMask")
+                && let Some(users) = mask_users.get_mut(&old)
+            {
+                *users = users.saturating_sub(1);
+            }
             let private_mask = doc.add(Object::Stream(m));
             new.dict.set(b"SMask".to_vec(), Object::Ref(private_mask));
         }
