@@ -2891,6 +2891,7 @@ version = "0.3.0"
 dependencies = [
  "fearless_simd",
  "hayro-ccitt",
+ "image",
 ]
 
 [[package]]
@@ -4672,9 +4673,12 @@ name = "pdfcraft-create"
 version = "0.15.0"
 dependencies = [
  "encoding_rs",
+ "hayro-ccitt",
+ "hayro-jbig2",
  "hayro-syntax",
  "image",
  "pdfcraft-cos",
+ "pdfcraft-filters",
  "pdfcraft-fonts",
  "pdfcraft-model",
  "pdfcraft-xfa",
@@ -4707,6 +4711,7 @@ dependencies = [
  "pdfcraft-cos",
  "pdfcraft-fonts",
  "pdfcraft-model",
+ "sha2 0.11.1",
  "thiserror 2.0.21",
  "unicode-bidi",
 ]
@@ -4717,6 +4722,7 @@ version = "0.15.0"
 dependencies = [
  "chrono",
  "craft-docpath",
+ "getrandom 0.4.3",
  "icu_properties",
  "idna",
  "image",
@@ -4778,7 +4784,10 @@ dependencies = [
 name = "pdfcraft-filters"
 version = "0.15.0"
 dependencies = [
+ "fax",
  "flate2",
+ "hayro-ccitt",
+ "hayro-jbig2",
  "proptest",
  "thiserror 2.0.21",
  "weezl 0.2.1",
@@ -4898,6 +4907,7 @@ dependencies = [
  "pdfcraft-filters",
  "pdfcraft-model",
  "pdfcraft-render",
+ "proptest",
  "thiserror 2.0.21",
  "zune-jpeg",
 ]
@@ -4958,6 +4968,7 @@ dependencies = [
  "pdfcraft-content",
  "pdfcraft-cos",
  "pdfcraft-edit",
+ "pdfcraft-filters",
  "pdfcraft-fonts",
  "pdfcraft-forms",
  "pdfcraft-model",
