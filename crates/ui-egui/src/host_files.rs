@@ -32,6 +32,8 @@ pub struct HostFiles {
     pub save: SaveHandler,
     pending: Arc<Mutex<Option<Completion>>>,
     active: bool,
+    // Restore the tablet layout after rotating or leaving a narrow Split View.
+    wide_panes: Option<(bool, Option<crate::RightPanel>, bool)>,
     origins: HashMap<DocId, String>,
     /// OS-delivered imports retain the same host identity as picker imports.
     pub incoming: Arc<Mutex<Vec<HostDocument>>>,
@@ -44,11 +46,37 @@ enum Completion {
 
 impl HostFiles {
     pub fn new(open: OpenHandler, save: SaveHandler) -> Self {
-        Self { open, save, pending: Arc::new(Mutex::new(None)), active: false, origins: HashMap::new(), incoming: Arc::new(Mutex::new(Vec::new())) }
+        Self {
+            open,
+            save,
+            pending: Arc::new(Mutex::new(None)),
+            active: false,
+            wide_panes: None,
+            origins: HashMap::new(),
+            incoming: Arc::new(Mutex::new(Vec::new())),
+        }
     }
 }
 
 impl PdfCraftApp {
+    pub(crate) fn update_host_width(&mut self, width: f32) {
+        let Some(host) = &mut self.host_files else { return };
+        if width < 600.0 {
+            if host.wide_panes.is_none() {
+                host.wide_panes = Some((self.left_open, self.right, self.right_panel_closed));
+                self.left_open = false;
+                self.right = None;
+                self.right_panel_closed = true;
+            }
+        } else if let Some(panes) = host.wide_panes.take() {
+            (self.left_open, self.right, self.right_panel_closed) = panes;
+        }
+    }
+
+    pub(crate) fn compact_mobile(&self) -> bool {
+        self.host_files.as_ref().is_some_and(|host| host.wide_panes.is_some())
+    }
+
     fn open_host_document(&mut self, file: HostDocument) {
         let before = self.views.len();
         if let Err(error) = self.open_bytes(&file.name, None, file.bytes) {
@@ -207,6 +235,23 @@ mod tests {
             }),
         ));
         (app, pending)
+    }
+
+    #[test]
+    fn narrow_host_folds_panes_once_and_restores_the_wide_layout() {
+        let (mut app, _) = app();
+        app.choose_right_panel(Some(crate::RightPanel::Pages));
+        app.update_host_width(390.0);
+        assert!(!app.left_open && app.right.is_none() && app.right_panel_closed);
+        app.switch_mode(crate::Mode::AllTools, true);
+        app.update_host_width(390.0);
+        assert!(app.left_open, "an explicit tool choice survives the next frame");
+        app.update_host_width(768.0);
+        assert_eq!(app.right, Some(crate::RightPanel::Pages));
+        assert!(!app.right_panel_closed);
+        app.host_files = None;
+        app.update_host_width(390.0);
+        assert!(app.left_open && app.right.is_some(), "desktop panes keep their layout");
     }
 
     #[test]

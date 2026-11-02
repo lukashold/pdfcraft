@@ -76,6 +76,7 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                     + window_controls::width(&controls.right);
                 // Open stays in sight after the tabs: its icon, text and padding, and the gaps around it.
                 let open_width = ui.fonts_mut(|f| f.layout_no_wrap(tl!("Open").into(), theme::medium(13.0), t.text).size().x) + 38.0 + 12.0;
+                let controls_width = if app.compact_mobile() { 0.0 } else { controls_width };
                 let mut tabs_width = (ui.available_width() - controls_width - open_width).max(0.0);
                 // Tabs shrink to share the strip (names end in "…") and scroll only once they reach
                 // their narrowest; then arrows either side say so and step through them.
@@ -275,6 +276,9 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                 let tip = crate::commands::command_tip(ui.ctx(), tl!("Open a PDF ({key})"), "file.open");
                 if widgets::ghost_button_sized(ui, "plus", tl!("Open"), tab_h).on_hover_text(tip).clicked() {
                     app.open_dialog();
+                }
+                if app.compact_mobile() {
+                    return;
                 }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if !controls.right.is_empty() {
@@ -494,6 +498,25 @@ pub fn mode_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                 }
                 // Acrobat's mode bar has no Read tab: reading is what the viewer does with no tool
                 // in use. Read mode (the panes hidden) stays a View command and a default workspace.
+                if app.compact_mobile() {
+                    if widgets::ghost_button_sized(ui, "panel-left", tl!("All tools"), 40.0).clicked() {
+                        if app.left_open && app.mode != Mode::Read {
+                            app.left_open = false;
+                        } else {
+                            app.choose_right_panel(None);
+                            app.switch_mode(Mode::AllTools, true);
+                        }
+                    }
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        if app.active.is_some() && icons::button(ui, "save", 40.0, false, tl!("Save")).clicked() {
+                            app.run_command("file.save");
+                        }
+                        if icons::button(ui, "search", 40.0, false, tl!("Find tools and commands")).clicked() {
+                            app.palette_open = true;
+                        }
+                    });
+                    return;
+                }
                 for (mode, label) in [(Mode::AllTools, "All tools"), (Mode::Edit, "Edit"), (Mode::Convert, "Convert"), (Mode::Sign, "E-Sign")] {
                     if widgets::mode_tab(ui, tl!(label), app.mode == mode).clicked() {
                         app.switch_mode(mode, true);

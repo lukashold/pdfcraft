@@ -1,6 +1,8 @@
 use std::io::{Read, Write};
 use tauri::Manager;
-use tauri_plugin_dialog::{DialogExt, FilePath};
+#[cfg(not(target_os = "ios"))]
+use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_dialog::FilePath;
 use tauri_plugin_fs::{FsExt, OpenOptions};
 
 pub const MAX_DOCUMENT: usize = 64 * 1024 * 1024;
@@ -75,24 +77,42 @@ pub fn export(app: &tauri::AppHandle, name: &str, bytes: &[u8], origin: Option<&
         None => None,
     };
     let retained = stage(&folder, recovered.as_deref(), bytes)?;
-    let Some(destination) = app.dialog().file().set_file_name(&name).blocking_save_file() else {
+    #[cfg(target_os = "ios")]
+    let exported = export_staged(app, &name, &retained);
+    #[cfg(not(target_os = "ios"))]
+    let exported = write_to_provider(app, &name, bytes);
+    if !exported.map_err(|e| format!("Export failed; your recovery copy remains in app storage: {e}"))? {
         // Cancellation did not write an external document; the editor remains dirty.
         if recovered.is_none() {
             let _ = std::fs::remove_file(&retained);
         }
         return Ok(false);
-    };
-    let mut options = OpenOptions::new();
-    options.write(true).create(true).truncate(true);
-    #[cfg(target_os = "ios")]
-    let _scope = ScopedFile(app, destination.clone());
-    let write = app.fs().open(destination, options).and_then(|mut file| file.write_all(bytes).and_then(|()| file.sync_all()));
-    write.map_err(|e| format!("Export failed; your recovery copy remains in app storage: {e}"))?;
+    }
     let _ = std::fs::remove_file(retained);
     if let (Some(token), Some(path)) = (origin, recovered) {
         app.state::<crate::State>().recoveries.lock().map_err(|_| "Recovery storage is unavailable")?.remove(token);
         app.state::<crate::State>().recoverable.lock().map_err(|_| "Recovery storage is unavailable")?.remove(&path);
     }
+    Ok(true)
+}
+
+#[cfg(target_os = "ios")]
+fn export_staged(app: &tauri::AppHandle, name: &str, retained: &std::path::Path) -> Result<bool, String> {
+    // Files copies the complete PDF before returning the chosen URL. A private hard link
+    // gives that PDF its suggested name without modifying the recovery spool or Documents.
+    let folder = retained.parent().ok_or("The staged PDF needs a recovery directory")?;
+    let temporary = tempfile::Builder::new().prefix(".sharing-").tempdir_in(folder).map_err(|e| e.to_string())?;
+    let source = temporary.path().join(name);
+    std::fs::hard_link(retained, &source).map_err(|e| format!("Could not prepare the PDF for Files: {e}"))?;
+    tauri_plugin_pdf_export::export(app, &source)
+}
+
+#[cfg(not(target_os = "ios"))]
+fn write_to_provider(app: &tauri::AppHandle, name: &str, bytes: &[u8]) -> Result<bool, String> {
+    let Some(destination) = app.dialog().file().set_file_name(name).blocking_save_file() else { return Ok(false) };
+    let mut options = OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    app.fs().open(destination, options).and_then(|mut file| file.write_all(bytes).and_then(|()| file.sync_all())).map_err(|e| e.to_string())?;
     Ok(true)
 }
 
@@ -128,7 +148,12 @@ fn published(folder: &std::path::Path, clean_partial: bool) -> Result<Vec<std::p
         let entry = entry.map_err(|e| e.to_string())?;
         let name = entry.file_name();
         let name = name.to_string_lossy();
-        if !entry.file_type().map_err(|e| e.to_string())?.is_file() {
+        let file_type = entry.file_type().map_err(|e| e.to_string())?;
+        if clean_partial && file_type.is_dir() && name.starts_with(".sharing-") {
+            // The process may have exited with the native export picker still open.
+            std::fs::remove_dir_all(entry.path()).map_err(|e| e.to_string())?;
+        }
+        if !file_type.is_file() {
             continue;
         }
         if name.starts_with("export-") && name.ends_with(".pdf") {
@@ -196,6 +221,9 @@ mod tests {
     #[test]
     fn a_killed_partial_write_does_not_consume_recovery_capacity() {
         let folder = tempfile::tempdir().unwrap();
+        let abandoned = folder.path().join(".sharing-aborted");
+        std::fs::create_dir(&abandoned).unwrap();
+        std::fs::write(abandoned.join("User document.pdf"), b"previous export").unwrap();
         for n in 0..8 {
             std::fs::write(folder.path().join(format!(".writing-crash-{n}")), b"partial").unwrap();
         }

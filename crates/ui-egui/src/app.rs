@@ -667,6 +667,7 @@ impl eframe::App for PdfCraftApp {
         if self.draws_window_frame() {
             window_controls::resize_edges(&ctx);
         }
+        self.update_host_width(ui.available_width());
         chrome::tab_strip(self, ui);
         chrome::mode_bar(self, ui);
         // Whichever way another tab came to the front, it shows instead of the expanded view.
