@@ -14,24 +14,39 @@ Install Rust 1.95.0, `trunk 0.21.14` and `tauri-cli 2.12.2` with Cargo (`--locke
 cargo install trunk --version 0.21.14 --locked
 cargo install tauri-cli --version 2.12.2 --locked
 rustup target add wasm32-unknown-unknown
-# Set CRAFT_FONTS_DIR to the pinned craft-fonts checkout from mobile.yml.
-cargo xtask mobile frontend
+# Set CRAFT_FONTS_DIR to the craft-fonts checkout pinned by the craft-fonts-ref in .github/workflows/ci.yml.
+export CRAFT_FONTS_REQUIRED=1
+cargo xtask mobile frontend-preview  # for builds from a fork
 cargo xtask mobile prepare android
 cargo xtask mobile android
-# On macOS instead:
+# On macOS instead, with full Xcode and its iOS platform installed:
+brew install xcodegen cocoapods libimobiledevice
+rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 cargo xtask mobile prepare ios
 cargo xtask mobile ios-simulator
+cargo xtask mobile ios-device-unsigned
 ```
 
-The generated Gradle/Xcode projects are ignored, recreated using the pinned CLI and populated with attributed PdfCraft icons. The iOS privacy manifest declares only the file-timestamp API used for user-selected document access. No analytics or tracking is included. `.github/workflows/mobile.yml` builds debug ARM64/x86_64 APKs and an unsigned ARM64 iOS simulator app on hosted runners with time limits. A simulator bundle is **not** installable on a physical iPad or iPhone.
+In Xcode Settings → Locations, select the full Xcode installation for Command Line Tools. In Components, install the iOS Simulator runtime matching the SDK shown by `xcrun --sdk iphonesimulator --show-sdk-version`.
 
-Fork distributions must use `cargo xtask mobile frontend-preview`: it removes the protected upstream marks from the built UI, identifies it as an independent preview, and restores the original source files after building (including build failure). Run it in a disposable checkout without concurrent builds; termination of the packaging process itself can interrupt restoration. CI automatically selects this mode outside `storytold/pdfcraft`. The shared UI sources in the contribution remain unchanged by this packaging policy. See [the brand license](../../docs/brand/LICENSE-brand.txt).
+On an Apple silicon Mac, `ios-simulator` produces `packaging/mobile/app/gen/apple/build/arm64-sim/PdfCraft.app`. With an iPhone or iPad simulator booted, run these commands from the repository root:
+
+```sh
+xcrun simctl install booted packaging/mobile/app/gen/apple/build/arm64-sim/PdfCraft.app
+xcrun simctl launch booted org.pdfcraft.mobile
+```
+
+`ios-device-unsigned` builds a release for the physical iPhone/iPad architecture and packages it at `packaging/mobile/app/gen/apple/build/arm64/PdfCraft.ipa`. It runs without signing credentials. Installing on a physical device requires a signed build and a provisioning profile for that device.
+
+The generated Gradle/Xcode projects are ignored, recreated using the pinned CLI and populated with attributed PdfCraft icons. The iOS privacy manifest declares only the file-timestamp API used for user-selected document access. No analytics or tracking is included. A simulator bundle is **not** installable on a physical iPad or iPhone.
+
+Fork distributions must use `cargo xtask mobile frontend-preview`: it removes the protected upstream marks from the built UI, identifies it as an independent preview, and restores the original source files after building (including build failure). Run it in a disposable checkout without concurrent builds; termination of the packaging process itself can interrupt restoration. The shared UI sources in the contribution remain unchanged by this packaging policy. See [the brand license](../../docs/brand/LICENSE-brand.txt).
 
 The frontend build also collects the project, Lucide, embedded-font, colour-profile and CMap license texts from their checked-in or Cargo-locked sources, including the selected craft-fonts web faces. It appends the license/copyright/notice files, authors and source declarations from both locked Cargo graphs, including the native host and build dependencies. `THIRD-PARTY-NOTICES.txt` travels in the frontend artifact and is bundled as a native resource in both apps. Missing required notices fail packaging. `cargo xtask mobile notices` can regenerate this file independently for host testing.
 
 Android additionally applies `android-notices.gradle` to the generated application project. For each built variant, Gradle resolves its actual external runtime AARs/JARs and Maven POMs, including transitive AndroidX/Material dependencies. Before merging APK assets, the task retains complete original LICENSE, NOTICE, COPYRIGHT and COPYING entries (also inside nested JARs) without changing their bytes. `assets/ANDROID-THIRD-PARTY-NOTICES.txt` records coordinates and SHA-256 values; `assets/pdfcraft-android-licenses/` contains the retained texts, exact POMs, Apache-2.0 text and the pinned Material notice. These files supplement the Cargo/frontend notices; they do not relicense dependencies. Missing artifacts/POMs, invalid archives or exceeded bounds fail the build. The adapter only resolves metadata and invokes the Rust collector; `cargo test -p xtask mobile::android_notices` covers nested notices, byte preservation, invalid archives and size limits. Native SDK CI must verify the resulting APK contents before publication.
 
-For physical iOS devices, set `APPLE_DEVELOPMENT_TEAM` and configure the signing certificate/provisioning profile in Xcode, then run `cargo tauri ios build --target aarch64` from `packaging/mobile/app`. Android production signing is configured in the generated Gradle project using the official Tauri guide. Signing keys, store accounts and store publishing are not part of this contribution. The application identifier is `org.pdfcraft.mobile`; a distributor must choose an identifier it can provision before releasing.
+For a signed iOS build, set an `identifier` your team can provision in `packaging/mobile/app/tauri.conf.json` before `prepare ios`. Set `APPLE_DEVELOPMENT_TEAM` to your team ID, configure your signing certificate and provisioning profile in Xcode, then run `cargo tauri ios build --target aarch64 --export-method debugging` from `packaging/mobile/app` for development distribution. Android production signing is configured in the generated Gradle project using the official Tauri guide.
 
 ## Documents and export guarantees
 
@@ -43,6 +58,6 @@ The existing browser-download export paths (non-PDF conversion, split/export act
 
 ## Validation
 
-Native adapter tests cover path/name/size bounds. Shared UI tests simulate native success, cancellation, failure and edits made while saving; an older exported snapshot cannot close or replace a newer document. Packaging tests ensure every UI catalog is advertised to iOS and that PDF associations/safe areas survive changes. CI additionally builds the actual Android and iOS targets. Device-level PDF picker/provider, suspend/resume, handwriting and highlighting checks on physical tablets remain required before a stable release; compilation alone is not that verification.
+Native adapter tests cover path/name/size bounds. Shared UI tests simulate native success, cancellation, failure and edits made while saving; an older exported snapshot cannot close or replace a newer document. Packaging tests ensure every UI catalog is advertised to iOS and that PDF associations/safe areas survive changes. Device-level PDF picker/provider, suspend/resume, handwriting and highlighting checks on physical tablets remain required before a stable release; compilation alone is not that verification.
 
 Primary implementation references: [Tauri mobile file associations](https://v2.tauri.app/learn/mobile-file-associations/), [dialog plugin](https://v2.tauri.app/plugin/dialog/), [filesystem plugin](https://v2.tauri.app/plugin/file-system/), [Android distribution](https://v2.tauri.app/distribute/google-play/) and [iOS distribution](https://v2.tauri.app/distribute/app-store/).

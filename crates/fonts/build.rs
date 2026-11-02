@@ -11,6 +11,8 @@ use std::path::PathBuf;
 
 #[path = "src/cjk_scripts.rs"]
 mod cjk_scripts;
+#[path = "web_faces.rs"]
+mod web_faces;
 
 /// Build-script entry point: embed craft-fonts from `CRAFT_FONTS_DIR`, make a missing or invalid input fatal
 /// when `CRAFT_FONTS_REQUIRED` is set, and write `craft_fonts.rs` to `OUT_DIR`.
@@ -96,21 +98,7 @@ fn manifest(dir: &std::path::Path, manifest: &std::path::Path, wasm: bool, stric
                 }
             }
         }
-        // Arabic interface faces are small, so the web build keeps them too.
-        let arabic = scripts.split(',').any(|s| s.trim() == "Arab");
-        // Telugu faces too, for the Telugu interface.
-        let telugu = scripts.split(',').any(|s| s.trim() == "Telu");
-        // And the Hebrew ones (small), for Hebrew text and Edit text on the web.
-        let hebrew = scripts.split(',').any(|s| s.trim() == "Hebr");
-        // Devanagari too, for the Hindi interface (one small face).
-        let devanagari = scripts.split(',').any(|s| s.trim() == "Deva");
-        let web_face = (*family == "BIZ UDPGothic" && *style == "Regular")
-            || arabic
-            || telugu
-            || hebrew
-            || scripts.split(',').any(|s| s.trim() == "Thai")
-            || devanagari;
-        if wasm && !web_face {
+        if wasm && !web_faces::includes(family, style, scripts) {
             continue;
         }
         has_hans |= cjk_scripts::has_script_tag(scripts, "Hans");

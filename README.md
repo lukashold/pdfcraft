@@ -1,12 +1,5 @@
-<p align="center">
-  <a href="https://getartcraft.com/">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="docs/brand/artcraft-logo-white.svg">
-      <img alt="ArtCraft" src="docs/brand/artcraft-logo.svg" width="200">
-    </picture>
-  </a>
-</p>
-
+<p align="center"><strong>Independent iPhone and iPad preview</strong><br>
+<a href="packaging/mobile/README.md#build">Build the app or run it in the iOS Simulator</a></p>
 
 <p align="center">
   <img src="assets/app-icon/hicolor/256x256/apps/ai.storyteller.pdfcraft.png" width="128" height="128" alt="PdfCraft icon: an engraved lion on a red tile">

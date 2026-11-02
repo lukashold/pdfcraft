@@ -6,6 +6,8 @@ use anyhow::{Context, Result, bail, ensure};
 
 #[path = "mobile_android_notices.rs"]
 mod android_notices;
+#[path = "../../crates/fonts/web_faces.rs"]
+mod web_faces;
 
 fn run_in(dir: &Path, tool: &str, args: &[&str]) -> Result<()> {
     let status = Command::new(tool).args(args).current_dir(dir).status().with_context(|| format!("run {tool}"))?;
@@ -109,8 +111,7 @@ fn frontend_notices(root: &Path) -> Result<()> {
         for line in manifest.lines().map(str::trim).filter(|line| !line.is_empty() && !line.starts_with('#')) {
             let fields = line.split(" | ").map(str::trim).collect::<Vec<_>>();
             let [family, style, _, scripts, _, licence, ..] = fields.as_slice() else { bail!("Invalid craft-fonts manifest line") };
-            let web = (*family == "BIZ UDPGothic" && *style == "Regular") || scripts.split(',').any(|s| matches!(s.trim(), "Arab" | "Telu"));
-            if web && seen.insert(*licence) {
+            if web_faces::includes(family, style, scripts) && seen.insert(*licence) {
                 ensure!(Path::new(licence).components().all(|c| matches!(c, std::path::Component::Normal(_))), "Invalid font licence path");
                 append_notice(&mut text, family, &fonts.join(licence))?;
             }
@@ -298,8 +299,9 @@ pub fn run(args: &[String]) -> Result<()> {
         }
         ["android"] => run_in(&app, "cargo", &["tauri", "android", "build", "--ci", "--debug", "--apk", "--target", "aarch64", "x86_64"]),
         ["ios-simulator"] => run_in(&app, "cargo", &["tauri", "ios", "build", "--ci", "--debug", "--target", "aarch64-sim", "--no-sign"]),
+        ["ios-device-unsigned"] => run_in(&app, "cargo", &["tauri", "ios", "build", "--ci", "--target", "aarch64", "--no-sign"]),
         _ => bail!(
-            "Usage: cargo xtask mobile frontend | frontend-preview | notices | prepare android | prepare ios | android | ios-simulator | android-notices MANIFEST OUTPUT"
+            "Usage: cargo xtask mobile frontend | frontend-preview | notices | prepare android | prepare ios | android | ios-simulator | ios-device-unsigned | android-notices MANIFEST OUTPUT"
         ),
     }
 }
