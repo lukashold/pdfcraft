@@ -9,8 +9,21 @@
       html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #f1f1f3; overscroll-behavior: none; }
       #safe-area { position: fixed; top: env(safe-area-inset-top); right: env(safe-area-inset-right); bottom: env(safe-area-inset-bottom); left: env(safe-area-inset-left); }
       canvas { width: 100%; height: 100%; display: block; outline: none; touch-action: none; }
-      @media (prefers-color-scheme: dark) { html, body { background: #19191c; } }
+      #startup { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: .9rem; padding: 2rem; font: 600 1.5rem system-ui, sans-serif; color: #29292d; text-align: center; }
+      #startup progress { width: 7rem; accent-color: #575aca; }
+      #startup a { color: inherit; font-size: 1rem; }
+      @media (prefers-color-scheme: dark) { html, body { background: #19191c; } #startup { color: #ebebef; } }
+      @media (prefers-reduced-motion: reduce) { #startup progress { opacity: 0; } }
     </style>
   </head>
-  <body><div id="safe-area"><canvas id="pdfcraft"></canvas></div></body>
+  <body>
+    <div id="safe-area">
+      <canvas id="pdfcraft"></canvas>
+      <div id="startup" role="status">
+        <span id="startup-name">PdfCraft</span>
+        <progress id="startup-progress" aria-labelledby="startup-name"></progress>
+        <a id="startup-retry" href="./index.html" hidden>Restart PdfCraft</a>
+      </div>
+    </div>
+  </body>
 </html>

@@ -421,7 +421,7 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
         app.last_right = panel;
     }
     // The rail first: it is the outermost panel on the right.
-    if app.active.is_some() && !app.compact_mobile() {
+    if app.active.is_some() && !app.compact_mobile() && !(app.host_files.is_some() && app.mode == Mode::Read) {
         crate::chrome::right_rail(app, ui);
     }
     // The expanded All tools view covers the panes.

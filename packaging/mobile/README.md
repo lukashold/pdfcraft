@@ -38,6 +38,19 @@ xcrun simctl launch booted org.pdfcraft.mobile
 
 `ios-device-unsigned` builds a release for the physical iPhone/iPad architecture and packages it at `packaging/mobile/app/gen/apple/build/arm64/PdfCraft.ipa`. It runs without signing credentials. Installing on a physical device requires a signed build and a provisioning profile for that device.
 
+To run the bundled editor on your own iPad from the prepared checkout:
+
+1. Connect the unlocked iPad to the Mac, trust the Mac on the iPad, and add your Apple Account in Xcode → Settings → Accounts if necessary.
+2. From `packaging/mobile/app`, run the following with your own unique bundle identifier. Keep the terminal open while Xcode builds: its Rust build phase uses the running Tauri process.
+
+   ```sh
+   cargo tauri ios build --debug --open --config '{"identifier":"com.example.yourname.pdfcraft"}'
+   ```
+
+3. In Xcode, select the iOS app target, enable **Automatically manage signing** under **Signing & Capabilities**, and select your team. Choose the actual iPad in the toolbar and press **Run**. If requested, enable **Developer Mode** on the iPad under **Settings → Privacy & Security**, restart, and confirm.
+
+The app then opens from the iPad Home Screen without the Mac or a development server. With a free Personal Team, repeat the signed install after seven days ([Apple account limits](https://developer.apple.com/help/account/basics/about-your-developer-account)). See also [Apple's device setup guide](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices).
+
 The generated Gradle/Xcode projects are ignored, recreated using the pinned CLI and populated with attributed PdfCraft icons. The iOS privacy manifest declares only the file-timestamp API used for user-selected document access. No analytics or tracking is included. A simulator bundle is **not** installable on a physical iPad or iPhone.
 
 Fork distributions must use `cargo xtask mobile frontend-preview`: it removes the protected upstream marks from the built UI, identifies it as an independent preview, and restores the original source files after building (including build failure). Run it in a disposable checkout without concurrent builds; termination of the packaging process itself can interrupt restoration. The shared UI sources in the contribution remain unchanged by this packaging policy. See [the brand license](../../docs/brand/LICENSE-brand.txt).

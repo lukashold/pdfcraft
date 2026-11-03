@@ -40,6 +40,33 @@ fn home_shows_welcome_and_tools() {
 }
 
 #[test]
+fn mobile_read_mode_stays_in_reach_on_ipad_and_in_split_view() {
+    use pdfcraft_ui_egui::{Mode, RightPanel, host_files::HostFiles};
+
+    for width in [834.0, 390.0] {
+        let mut h = Harness::builder().with_size(egui::vec2(width, 1000.0)).build_eframe(|_| {
+            let mut app = PdfCraftApp::new();
+            app.set_option("language", "de").unwrap();
+            app.host_files = Some(HostFiles::new(Box::new(|_| Ok(())), Box::new(|_, _| Ok(()))));
+            app.open_bytes("Notizen.pdf", None, FIXTURE.to_vec()).unwrap();
+            app
+        });
+        h.run_steps(4);
+        h.state_mut().choose_right_panel(Some(RightPanel::Bookmarks));
+        h.run_steps(2);
+        let toggle = h.get_by_label("Lesemodus");
+        assert!(h.ctx.content_rect().contains_rect(toggle.rect()));
+        assert!(toggle.rect().height() >= 44.0);
+        toggle.click();
+        h.run_steps(3);
+        assert_eq!((h.state().mode, h.state().right), (Mode::Read, None));
+        h.get_by_label("Lesemodus").click();
+        h.run_steps(3);
+        assert_eq!((h.state().mode, h.state().right), (Mode::AllTools, Some(RightPanel::Bookmarks)));
+    }
+}
+
+#[test]
 fn tools_panel_side_preference_moves_and_persists() {
     use pdfcraft_ui_egui::Dialog;
 

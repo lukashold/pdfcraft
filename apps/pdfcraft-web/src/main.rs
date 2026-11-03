@@ -84,6 +84,21 @@ fn main() {
                 }),
             )
             .await;
+        #[cfg(feature = "mobile-host")]
+        if let Some(document) = web_sys::window().and_then(|window| window.document()) {
+            if started.is_ok() {
+                if let Some(startup) = document.get_element_by_id("startup") {
+                    startup.remove();
+                }
+            } else {
+                if let Some(progress) = document.get_element_by_id("startup-progress") {
+                    progress.remove();
+                }
+                if let Some(retry) = document.get_element_by_id("startup-retry") {
+                    let _ = retry.remove_attribute("hidden");
+                }
+            }
+        }
         if let Err(e) = started {
             eframe::web_sys::console::error_1(&e);
             if query_param("host").as_deref() == Some("parent")

@@ -34,10 +34,17 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
     // macOS: the strip is the 28 pt title bar, so the traffic lights are centred in it; tabs and
     // buttons shrink to keep a margin above and below.
     let mac = cfg!(target_os = "macos") && app.integrated_titlebar;
+    let mobile_document = app.host_files.is_some() && app.active.is_some();
     let left = if mac { MAC_CONTENT_LEFT as i8 } else { 8 };
     let (tab_h, button) = if mac { (MAC_TITLE_BAR - 2.0, 24.0) } else { (TAB_HEIGHT, STRIP_BUTTON) };
     egui::Panel::top("tab_strip")
-        .exact_size(if mac { MAC_TITLE_BAR } else { TAB_STRIP })
+        .exact_size(if mobile_document {
+            48.0
+        } else if mac {
+            MAC_TITLE_BAR
+        } else {
+            TAB_STRIP
+        })
         .frame(egui::Frame::NONE.fill(t.titlebar).inner_margin(egui::Margin { left, right: 10, top: 0, bottom: 0 }))
         .show(ui, |ui| {
             let full = ui.max_rect();
@@ -68,6 +75,11 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                 if icons::button(ui, "house", button, app.active.is_none() && !app.combine_showing(), tl!("Home")).clicked() {
                     app.active = None;
                     app.combine_tab.focused = false;
+                }
+                // Outside the panes so the same touch target also brings the editing workspace back.
+                if mobile_document && ui.add(egui::Button::selectable(app.mode == Mode::Read, tl!("Read mode")).min_size(vec2(44.0, 44.0))).clicked()
+                {
+                    app.run_command("view.read_mode");
                 }
                 // Reserve the three icon buttons, Discord and their gaps outside the scrolling tabs.
                 let controls_width = ui.fonts_mut(|f| f.layout_no_wrap("Discord".into(), theme::medium(13.0), t.text).size().x)
