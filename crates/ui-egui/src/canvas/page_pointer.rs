@@ -13,6 +13,8 @@
 
 use egui::{Event, PointerButton, Pos2, Rect};
 
+use crate::stylus::PointerKind;
+
 /// A primary-button press or release, and where it happened.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum Edge {
@@ -51,12 +53,15 @@ pub(crate) struct PagePointer {
     pub primary_down: bool,
     /// Some button is down, wherever it was pressed.
     pub any_down: bool,
+    /// What made the latest press (a pen, a finger, a mouse), as the browser told the app this
+    /// frame. egui reports them all as one pointer; native presses are all `Mouse`.
+    pub kind: PointerKind,
 }
 
 impl PagePointer {
     /// The pointer for `resp`, the content widget that holds every page, allocated in `ui`, while
-    /// a dialog is open over the window or not (`modal`).
-    pub(crate) fn read(ui: &egui::Ui, resp: &egui::Response, modal: bool) -> Self {
+    /// a dialog is open over the window or not (`modal`), with what made the latest press (`kind`).
+    pub(crate) fn read(ui: &egui::Ui, resp: &egui::Response, modal: bool, kind: PointerKind) -> Self {
         let (at, origin, edges, samples, primary_down, any_down) = ui.input(|i| {
             (i.pointer.interact_pos(), i.pointer.press_origin(), edges(&i.events), samples(&i.events), i.pointer.primary_down(), i.pointer.any_down())
         });
@@ -82,9 +87,9 @@ impl PagePointer {
         ui.data_mut(|d| d.insert_temp(holding, still_down));
         let pos = at.filter(|p| held || on_top(p));
         if !held {
-            return Self { pos, origin: None, edges: Vec::new(), samples: Vec::new(), primary_down, any_down };
+            return Self { pos, origin: None, edges: Vec::new(), samples: Vec::new(), primary_down, any_down, kind };
         }
-        Self { pos, origin: press_origin, edges, samples, primary_down, any_down }
+        Self { pos, origin: press_origin, edges, samples, primary_down, any_down, kind }
     }
 
     /// Where the pointer is, when it is inside `r`.

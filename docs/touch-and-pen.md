@@ -31,6 +31,26 @@ pressure/tilt-sensitive ink, hardware eraser buttons or pen-specific palm reject
 current shared input backend does not reliably identify every pen separately from fingers.
 Two-finger cancellation is a gesture safeguard, not a pen classifier.
 
+## Stylus mode (browser)
+
+In the browser eframe reports pens and fingers as one pointer, but the browser itself names
+each one (`pointerType`). `stylus::install` listens for that ahead of eframe, in the capture
+phase on the window. Stylus mode turns on the first time a pen is used and is remembered for
+later visits; `?stylus=off` keeps it off and `?stylus=on` starts with it on. Native shells are
+unchanged.
+
+In stylus mode the pen keeps the chosen tool, and a finger moves the page with every tool the
+pen owns (Select, markup, Draw, redaction, measuring, marquee zoom, snapshots). Tap-to-place
+tools keep the finger. The app reads what made the latest press once per frame
+(`PdfCraftApp::stylus`); the pages see it as `PagePointer::kind`. A finger press with a pen tool
+pans by the Hand tool's path and the pages give it up with `DocView::cancel_press`, so it marks
+nothing. The pen's own touch events (Chrome on Android sends them) don't count as a finger.
+
+Touches that start while the pen is down, or within 0.3 s of its lift, are dropped as palms
+before eframe sees them. The timings come from a Pixel Tablet in Chrome, where Android already
+ignores a resting palm and deliberate finger swipes came 0.5-0.8 s after the pen. iPad and
+Windows pens in the browser are untested, and native pens are a separate matter.
+
 Automation uses the existing engine `Edit::AddAnnotation` and `comment_add` tool for document
 edits. The opt-in UI control channel accepts `ui.set` with `touch-mode=auto|on|off`; `ui.state`
 reports `touch_mode` and `touch_active`. Tests exercise real shell input, saved PDF InkList
@@ -41,3 +61,5 @@ coordinates, highlighting, cancellation, navigation, undo/redo and control-chann
 - 2026-10-11: first version (#1108).
 - 2026-11-02: reconciled with the page-input rules: samples and cancellation go through
   `PagePointer` and the pages' press cancellation; the toolbar follows Read mode and full screen.
+- 2026-11-02: stylus mode in the browser: the pen draws, a finger moves the page, palms are
+  dropped.

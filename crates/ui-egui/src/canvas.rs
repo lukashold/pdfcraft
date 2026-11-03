@@ -1137,6 +1137,9 @@ struct PageEnv<'a> {
     glide: Vec2,
     /// Two fingers' pan this frame, when they began over the page view.
     touch_delta: Vec2,
+    /// Stylus mode, and what made the latest press: a finger press with a tool the pen owns
+    /// moves the page instead.
+    stylus: crate::stylus::StylusInput,
     hand: bool,
     info: &'a DocInfo,
     initials: &'a Option<crate::fill_sign::SavedSig>,
@@ -2335,6 +2338,16 @@ fn cancel_on_escape(ctx: &egui::Context, view: &mut DocView, ptr: &PagePointer) 
     }
 }
 
+/// Stylus mode: a finger press with a tool the pen owns moves the page (`finger_pans`), so the
+/// pages give it up from its first frame, the way Escape gives up a press: nothing is marked,
+/// selected or placed, and the press is ignored until the finger lifts.
+fn cancel_finger_press(view: &mut DocView, ptr: &PagePointer, tool: QuickTool, stylus_mode: bool) {
+    let input = crate::stylus::StylusInput { enabled: stylus_mode, kind: ptr.kind };
+    if ptr.pressed().is_some() && !view.press_cancelled && crate::stylus::finger_pans(tool, input) {
+        view.cancel_press();
+    }
+}
+
 #[allow(clippy::cognitive_complexity)]
 fn draw_pages(
     ui: &mut egui::Ui,
@@ -2367,6 +2380,7 @@ fn draw_pages(
         navigation_enabled,
         precise_scroll,
         touch_delta,
+        stylus,
         prefs,
         preparing,
         selection_wheel,
@@ -2418,8 +2432,9 @@ fn draw_pages(
     view.screen_xforms.clear();
     // The pointer as the pages see it: nothing over them (a dialog from the frame it opens),
     // or a press they hold. The page modules read it rather than egui's raw pointer state.
-    let ptr = PagePointer::read(ui, &resp, modal);
+    let ptr = PagePointer::read(ui, &resp, modal, stylus.kind);
     cancel_on_escape(ui.ctx(), view, &ptr);
+    cancel_finger_press(view, &ptr, tool, stylus.enabled);
     view.router.settle(ptr.any_down, !ptr.edges.is_empty());
     // A new press is no longer the last one's, wherever it lands (the page it is on gives it
     // its owner; in the gap between pages it has none).
@@ -3336,9 +3351,11 @@ fn presentation_click_state(ui: &egui::Ui, view: &DocView, navigation_rect: Rect
     })
 }
 
-/// Whether one finger scrolls the view with `tool`: Select and Hand do; the others draw or mark.
-fn drag_scrolls(tool: QuickTool) -> bool {
-    matches!(tool, QuickTool::Select | QuickTool::Hand)
+/// Whether one finger scrolls the view with `tool`: Select and Hand do; the others draw or mark,
+/// except in stylus mode, where a finger moves the page with every tool the pen owns
+/// (`finger_pans`).
+fn drag_scrolls(tool: QuickTool, finger_pans: bool) -> bool {
+    finger_pans || matches!(tool, QuickTool::Select | QuickTool::Hand)
 }
 
 /// Pinch / ctrl+scroll zoom, anchored on the pointer or the current page.
@@ -3571,7 +3588,10 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     let row = shown_row(view, &rects);
     // Two fingers navigate: like a wheel gesture, they keep the pages' tools from the press.
     let middle_gesture = view.auto_scroll.blocks_input() || app.touch_input.blocked;
-    let drag_scrolls = drag_scrolls(app.quick_tool);
+    // Stylus mode: a finger pans the way the Hand tool does while the pen keeps the chosen tool,
+    // and the pages give up its press (`draw_pages`).
+    let finger_pans = crate::stylus::finger_pans(app.quick_tool, app.stylus);
+    let drag_scrolls = drag_scrolls(app.quick_tool, finger_pans);
     let touch_delta = app.touch_input.pan_over(avail, unobstructed);
     // Not scrolling: when the whole page or spread fits, the wheel would do nothing, so it turns
     // pages instead; zoomed in far enough to pan, it pans, and at the edge it turns the page on
@@ -3614,7 +3634,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
             content_h,
             avail,
             middle_gesture,
-            hand: app.quick_tool == QuickTool::Hand,
+            hand: app.quick_tool == QuickTool::Hand || finger_pans,
             drag_scrolls,
         },
     );
@@ -3735,6 +3755,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         today,
         can_paste_image,
         touch_delta,
+        stylus: app.stylus,
     };
     let mut page_out = PageOut::default();
     let out = page_scroll(ui, scroll, egui::Id::unique(("page-view-scope", view.id)), app.show_page_edge_shadows, |ui, viewport| {

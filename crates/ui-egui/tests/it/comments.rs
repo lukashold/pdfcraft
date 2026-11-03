@@ -6,6 +6,7 @@ use egui::{Pos2, pos2};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use pdfcraft_render::Annotation;
+use pdfcraft_ui_egui::stylus::{PointerKind, StylusInput};
 use pdfcraft_ui_egui::{PdfCraftApp, QuickTool};
 
 use crate::support;
@@ -289,6 +290,83 @@ fn a_touch_drag_highlights_text_instead_of_panning() {
     assert_eq!(comments(&h).len(), 1);
     assert_eq!(comments(&h)[0].subtype, "Highlight");
     assert_eq!(h.state().views[0].page_screen_rect(0).unwrap(), before);
+}
+
+/// Stylus mode in the browser, with the latest press made by `kind`.
+fn stylus(h: &mut Harness<'static, PdfCraftApp>, kind: PointerKind) {
+    h.state_mut().stylus = StylusInput { enabled: true, kind };
+}
+
+/// A one-contact drag from `a` to `b` as the browser delivers it, a finger's or (on Chrome for
+/// Android, which also sends touch events for it) a pen's.
+fn contact_drag(h: &mut Harness<'static, PdfCraftApp>, a: Pos2, b: Pos2) {
+    frame(h, vec![egui::Event::PointerMoved(a), contact(1, egui::TouchPhase::Start, a), pointer_button(a, true)]);
+    for i in 1..=6 {
+        let p = a + (b - a) * (i as f32 / 6.0);
+        frame(h, vec![egui::Event::PointerMoved(p), contact(1, egui::TouchPhase::Move, p)]);
+    }
+    frame(h, vec![pointer_button(b, false), contact(1, egui::TouchPhase::End, b), egui::Event::PointerGone]);
+    h.run_steps(3);
+}
+
+#[test]
+fn in_stylus_mode_a_finger_drag_with_highlight_moves_the_page_and_marks_nothing() {
+    let mut h = harness(|app| {
+        app.set_option("touch-mode", "on").unwrap();
+        app.set_option("quick", "highlight").unwrap();
+        app.set_option("zoom", "400").unwrap();
+    });
+    stylus(&mut h, PointerKind::Touch);
+    let v = &h.state().views[0];
+    let (a, before) = (v.glyph_screen_pos(0, 4).unwrap(), v.page_screen_rect(0).unwrap());
+    contact_drag(&mut h, a, a + egui::vec2(0.0, -120.0));
+    let after = h.state().views[0].page_screen_rect(0).unwrap();
+    assert!(after.top() < before.top() - 60.0, "the finger moves the page: {before:?} -> {after:?}");
+    assert!(comments(&h).is_empty(), "and highlights nothing");
+    assert_eq!(h.state().quick_tool, QuickTool::Comment(pdfcraft_ui_egui::comments::CommentTool::Highlight), "the pen keeps the tool");
+}
+
+#[test]
+fn in_stylus_mode_the_pen_highlights_although_it_also_sends_touch_events() {
+    let mut h = harness(|app| {
+        app.set_option("touch-mode", "on").unwrap();
+        app.set_option("quick", "highlight").unwrap();
+    });
+    stylus(&mut h, PointerKind::Pen);
+    let v = &h.state().views[0];
+    let (a, b, before) = (v.glyph_screen_pos(0, 4).unwrap(), v.glyph_screen_pos(0, 14).unwrap(), v.page_screen_rect(0).unwrap());
+    contact_drag(&mut h, a, b);
+    assert_eq!(comments(&h).len(), 1);
+    assert_eq!(comments(&h)[0].subtype, "Highlight");
+    assert_eq!(h.state().views[0].page_screen_rect(0).unwrap(), before, "the pen does not move the page");
+}
+
+#[test]
+fn in_stylus_mode_a_finger_does_not_ink_and_the_next_pen_stroke_does() {
+    let mut h = harness(|app| {
+        app.set_option("touch-mode", "on").unwrap();
+        app.set_option("quick", "ink").unwrap();
+    });
+    stylus(&mut h, PointerKind::Touch);
+    let (a, b) = (at(&h, 60.0, 100.0), at(&h, 120.0, 60.0));
+    contact_drag(&mut h, a, b);
+    assert!(comments(&h).is_empty(), "a finger makes no stroke and no dot");
+    stylus(&mut h, PointerKind::Pen);
+    let (a, b) = (at(&h, 60.0, 100.0), at(&h, 120.0, 60.0));
+    contact_drag(&mut h, a, b);
+    assert_eq!(ink_strokes(&h).len(), 1, "the pen draws");
+}
+
+#[test]
+fn without_stylus_mode_a_finger_still_marks() {
+    let mut h = harness(|app| {
+        app.set_option("touch-mode", "on").unwrap();
+        app.set_option("quick", "ink").unwrap();
+    });
+    h.state_mut().stylus = StylusInput { enabled: false, kind: PointerKind::Touch };
+    let (a, b) = (at(&h, 60.0, 100.0), at(&h, 120.0, 60.0));
+    contact_drag(&mut h, a, b);
+    assert_eq!(ink_strokes(&h).len(), 1, "no pen seen: touch input is as before");
 }
 
 #[test]
