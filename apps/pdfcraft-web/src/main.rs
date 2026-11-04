@@ -9,6 +9,8 @@ fn main() {
     use pdfcraft_ui_egui::PdfCraftApp;
 
     let options = eframe::WebOptions { renderer: eframe::Renderer::Glow, ..Default::default() };
+    // Ahead of eframe's own listeners, so it can tell pens from fingers and palms.
+    pdfcraft_ui_egui::stylus::install();
     wasm_bindgen_futures::spawn_local(async move {
         let Some(canvas) = web_sys::window()
             .and_then(|w| w.document())

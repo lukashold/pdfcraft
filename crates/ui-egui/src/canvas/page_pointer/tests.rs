@@ -26,7 +26,7 @@ fn frame_with(ctx: &Context, events: Vec<Event>, area: bool, modal: bool) -> Pag
     let input = egui::RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(400.0, 400.0))), events, ..Default::default() };
     let mut output = ctx.run_ui(input, |ui| {
         let (_, resp) = ui.allocate_exact_size(PAGES.size(), Sense::click_and_drag());
-        seen = PagePointer::read(ui, &resp, modal);
+        seen = PagePointer::read(ui, &resp, modal, crate::stylus::PointerKind::Mouse);
         if area {
             egui::Area::new(egui::Id::unique("over")).fixed_pos(OVER.min).show(ui.ctx(), |ui| {
                 ui.allocate_exact_size(OVER.size(), Sense::hover());

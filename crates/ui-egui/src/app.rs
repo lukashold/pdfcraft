@@ -106,6 +106,7 @@ impl PdfCraftApp {
             ui_scale: None,
             touch_mode: touch::TouchMode::Auto,
             touch_input: touch::TouchState::default(),
+            stylus: stylus::StylusInput::default(),
             system_text_scale: 1.0,
             ui_scale_applied: None,
             flatten_fill_sign_on_save: false,
@@ -475,6 +476,9 @@ impl eframe::App for PdfCraftApp {
         }
         self.sync_theme(ctx);
         self.observe_touch(ctx);
+        if let Some(input) = stylus::poll() {
+            self.stylus = input;
+        }
         let native = ctx.native_pixels_per_point().unwrap_or(1.0);
         ui_scale::sync(ctx, ui_scale::zoom(self.ui_scale, self.system_text_scale, native), &mut self.ui_scale_applied);
         // Remember user work even if its tab is subsequently closed or Home is selected.

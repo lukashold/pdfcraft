@@ -136,6 +136,7 @@ use platform::open_worker;
 #[cfg(not(target_arch = "wasm32"))]
 use platform::pickers;
 pub use platform::portable;
+pub use platform::stylus;
 #[cfg(not(target_arch = "wasm32"))]
 use platform::system_fonts;
 pub use platform::touch;
@@ -326,6 +327,9 @@ pub struct PdfCraftApp {
     /// Larger drawing tools: automatic after touch input, always on, or off.
     pub touch_mode: touch::TouchMode,
     touch_input: touch::TouchState,
+    /// Stylus mode and what made the latest press. The browser shell refreshes it every frame
+    /// (`stylus::install`); elsewhere it stays off unless a host sets it.
+    pub stylus: stylus::StylusInput,
     /// The desktop's text scaling (GNOME's text scaling factor), which the desktop app reads at
     /// launch. 1.0 elsewhere, so tests and screenshots don't depend on the machine.
     pub system_text_scale: f32,
